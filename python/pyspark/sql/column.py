@@ -682,6 +682,18 @@ class Column(object):
     desc_nulls_first = _unary_op("desc_nulls_first", _desc_nulls_first_doc)
     desc_nulls_last = _unary_op("desc_nulls_last", _desc_nulls_last_doc)
 
+    # TODO add documentation
+    # TODO fix python PY4J integration
+    _smin_doc = ""
+    _smax_doc = ""
+    _sdiff_doc = ""
+    _sdistinct_doc = ""
+
+    smin = _unary_op("smin", _smin_doc)
+    smax = _unary_op("smax", _smax_doc)
+    sdiff = _unary_op("sdiff", _sdiff_doc)
+    sdistinct = _unary_op("sdistinct", _sdistinct_doc)
+
     _isNull_doc = """
     True if the current expression is null.
 

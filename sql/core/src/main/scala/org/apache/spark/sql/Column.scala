@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineItemOptions, SkylineMax, SkylineMin}
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.{toPrettySQL, CharVarcharUtils}
 import org.apache.spark.sql.execution.aggregate.TypedAggregateExpression
@@ -1296,6 +1297,83 @@ class Column(val expr: Expression) extends Logging {
    * @since 2.1.0
    */
   def asc_nulls_last: Column = withExpr { SortOrder(expr, Ascending, NullsLast, Seq.empty) }
+
+  /**
+   * Returns a set of skyline options for minimization (MIN) according to the given expression.
+   * Distinctiveness is always set to false and must be specified AFTER the minimization.
+   *
+   * {{{
+   *   // Scala: create a minimization for the given skyline attribute
+   *   df.skyline(col("distance").smin)
+   * }}}
+   *
+   * @group skyline_ops
+   * @since skyline v0.0.1
+   */
+  def smin: Column = withExpr {
+    SkylineItemOptions.createSkylineItemOptions(distinct = false, expr, SkylineMin)
+  }
+
+  /**
+   * Returns a set of skyline options for maximization (MAX) according to the given expression.
+   * Distinctiveness is always set to false and must be specified AFTER the minimization.
+   *
+   * {{{
+   *   // Scala: create a maximization for the given skyline attribute
+   *   df.skyline(col("distance").smax)
+   * }}}
+   *
+   * @group skyline_ops
+   * @since skyline v0.0.1
+   */
+  def smax: Column = withExpr {
+    SkylineItemOptions.createSkylineItemOptions(distinct = false, expr, SkylineMax)
+  }
+
+  /**
+   * Returns a set of skyline options for difference (DIFF) according to the given expression.
+   * Distinctiveness is always set to false and must be specified AFTER the minimization.
+   *
+   * {{{
+   *   // Scala: create a difference distinction for the given skyline attribute
+   *   df.skyline(col("distance").sdiff)
+   * }}}
+   *
+   * @group skyline_ops
+   * @since skyline v0.0.1
+   */
+  def sdiff: Column = withExpr {
+    SkylineItemOptions.createSkylineItemOptions(distinct = false, expr, SkylineDiff)
+  }
+
+  /**
+   * Returns a set of skyline options for an existing skyline option where DISTINCT is set.
+   * Takes the data from the previously set skyline options and adds DISTINCT.
+   *
+   * {{{
+   *   // Scala: set DISTINCT for a minimization skyline
+   *   df.skyline(col("distance").smin.sdistinct)
+   *   // Scala: set DISTINCT for a maximization skyline
+   *   df.skyline(col("distance").smax.sdistinct)
+   *   // Scala: set DISTINCT for a difference skyline
+   *   df.skyline(col("distance").sdiff.sdistinct)
+   * }}}
+   *
+   * @group skyline_ops
+   * @since skyline v0.0.1
+   */
+  def sdistinct: Column = withExpr {
+    this.expr match {
+      case SkylineItemOptions(child, _, minMaxDiff) =>
+        SkylineItemOptions.createSkylineItemOptions(distinct = true, child, minMaxDiff)
+      case _ => throw new IllegalArgumentException(
+        s"""
+        | In a skyline, the column and MIN/MAX/DIFF must be specified before DISTINCT.
+        | If not specified otherwise, DISTINCT is assumed to be NOT SET.
+        """.stripMargin
+      )
+    }
+  }
 
   /**
    * Prints the expression to the console for debugging purposes.

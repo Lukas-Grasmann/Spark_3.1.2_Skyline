@@ -40,6 +40,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
 import org.apache.spark.sql.catalyst.encoders._
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.skyline._
 import org.apache.spark.sql.catalyst.json.{JacksonGenerator, JSONOptions}
 import org.apache.spark.sql.catalyst.optimizer.CombineUnions
 import org.apache.spark.sql.catalyst.parser.{ParseException, ParserUtils}
@@ -1896,6 +1897,217 @@ class Dataset[T] private[sql](
    */
   @scala.annotation.varargs
   def agg(expr: Column, exprs: Column*): DataFrame = groupBy().agg(expr, exprs : _*)
+
+  /**
+   * Skyline for a single dimension where distinct can (optionally) be set
+   * {{{
+   *   // df.skyline(...) for a single dimension including distinct
+   *   df.skyline("price", "min", "distinct")
+   *   // df.skyline(...) for a single dimension NOT including distinct
+   *   df.skyline("price", "min", "nondistinct")
+   *   // which is equivalent to
+   *   df.skyline("price", "min")
+   * }}}
+   *
+   * NOTE: only "distinct" and "nondistinct" are allowed
+   *
+   * @since skyline v0.0.1
+   */
+  def skyline(
+    column: String,
+    minMaxDiff: String,
+    distinct: String = "nondistinct"
+  ): DataFrame = {
+    skylineInternal( (isSkylineDistinct(distinct), column, minMaxDiff), Nil : _* )
+  }
+
+  /**
+   * Skyline for multiple dimensions NONE OF WHICH are distinct
+   * {{{
+   *   // df.skyline((...), (...), ...) where each bracket corresponds to a dimension
+   *   df.skyline(("price", "min"), ("distance", "min"))
+   * }}}
+   *
+   * @since skyline v0.0.1
+   */
+  def skyline(expr: (String, String), exprs: (String, String)*): DataFrame =
+    skylineInternal((false, expr._1, expr._2), exprs.map(f => (false, f._1, f._2)): _*)
+
+  /**
+   * Skyline for multiple dimensions where distinct can be set
+   * {{{
+   *   // df.skyline((...), (...), ...) where each bracket corresponds to a dimension
+   *   df.skyline(("price", "min", "distinct"), ("distance", "min", "nondistinct"))
+   * }}}
+   *
+   * NOTE: only "distinct" and "nondistinct" are allowed
+   *
+   * @since skyline v0.0.1
+   */
+  def skyline(
+    expr: (String, String, String),
+    exprs: (String, String, String)*
+  ): DataFrame = {
+      skylineInternal((isSkylineDistinct(expr._3), expr._1, expr._2),
+      exprs.map(f => (isSkylineDistinct(f._3), f._1, f._2)): _*
+    )
+  }
+
+  /**
+   * Internal skyline function for handling skylines with string specifications.
+   *
+   * This function does the actual generation of the skyline logical plan nodes.
+   * It is used for all functions that accept skylines in string format.
+   * (As opposed to columnar specifications i.e. col().smin etc.)
+   *
+   * At least one expression must be given and number of expressions is unlimited.
+   *
+   * @param expr mandatory expression tuple in format (distinct, column, min/max/diff)
+   * @param exprs further expressions in format (distinct, column, min/max/diff),
+   *              may be empty,
+   *              may contain arbitrary number of tuples
+   * @return (untyped) DataFrame of logical plan that contains a skyline node
+   *
+   * @since skyline v0.0.1
+   */
+  private def skylineInternal(
+    expr: (Boolean, String, String), exprs: (Boolean, String, String)*
+  ): DataFrame = withPlan {
+    SkylineOperator(
+      (expr +: exprs).map(
+        f => SkylineItemOptions.createSkylineItemOptions(f._1, Column(f._2).expr, f._3)
+      ),
+      logicalPlan
+    )
+  }
+
+  /**
+   * Skyline for multiple dimensions as columns
+   * {{{
+   *   // df.skyline(col(...).smin, col(...).smax, col(...).sdiff, ...)
+   *   // where each bracket corresponds to a dimension
+   *   df.skyline(col("price").smin, col("stars").smax)
+   *
+   *   // df.skyline(col("price").smin.sdistinct, ...) for distinctiveness of dimensions
+   *   df.skyline(col("price").smin.sdistinct, col("stars").smax, ...)
+   * }}}
+   *
+   * NOTE:
+   * only signature where non distinct must not be explicitly specified even
+   * if not all dimensions are non-distinct
+   *
+   * @since skyline v0.0.1
+   */
+  def skyline(expr: Column, exprs: Column*): DataFrame = withPlan {
+    SkylineOperator(
+      (expr +: exprs).map(
+        f => {
+          f.expr match {
+            case SkylineItemOptions(child, distinct, minMaxDiff) =>
+              SkylineItemOptions(child, distinct, minMaxDiff)
+            case _ =>
+              throw new IllegalArgumentException(
+                s"""
+                | In a skyline, the column and MIN/MAX/DIFF must be specified before DISTINCT.
+                | If not specified otherwise, DISTINCT is assumed to be NOT SET.
+                """.stripMargin
+              )
+          }
+        }
+      ),
+      logicalPlan
+    )
+  }
+
+  /**
+   * Skyline shorthand for minimizing a dimension
+   * {{{
+   * // df.skyline(df.smin(...), df.smin(...), ...)
+   * // Skyline minimization of a dimension
+   * df.skyline(df.smin("price", "distinct"), df.smin("distance"))
+   * // which is shorthand for
+   * df.skyline(col("price").smin.sdistinct, col("distance").smin)
+   * // and equivalent to
+   * df.skyline(df.smin("price").sdistinct, df.smin("distance"))
+   * }}}
+   *
+   * @since skyline v0.0.1
+   */
+  def smin(expr: String, distinct: String = "nondistinct"): Column =
+    Column(
+      SkylineItemOptions.createSkylineItemOptions(
+        isSkylineDistinct(distinct), Column(expr).expr, SkylineMin
+      )
+    )
+
+  /**
+   * Skyline shorthand for maximizing a dimension
+   * {{{
+   * // df.skyline(df.smax(...), df.smax(...), ...)
+   * // Skyline maximization of a dimension
+   * df.skyline(df.smax("price", "distinct"), df.smax("distance"))
+   * // which is shorthand for
+   * df.skyline(col("price").smax.sdistinct, col("distance").smax)
+   * and equivalent to
+   * df.skyline(df.smax("price").sdistinct, df.smax("distance"))
+   * }}}
+   *
+   * @since skyline v0.0.1
+   */
+  def smax(expr: String, distinct: String = "nondistinct"): Column =
+    Column(
+      SkylineItemOptions.createSkylineItemOptions(
+        isSkylineDistinct(distinct), Column(expr).expr, SkylineMax
+      )
+    )
+
+  /**
+   * Skyline shorthand for difference of a dimension
+   * {{{
+   * // df.skyline(df.sdiff(...), df.sdiff(...), ...)
+   * // Skyline difference of a dimension
+   * df.skyline(df.sdiff("price", "distinct"), df.sdiff("distance"))
+   * // which is shorthand for
+   * df.skyline(col("price").sdiff.sdistinct, col("distance").sdiff)
+   * and equivalent to
+   * df.skyline(df.sdiff("price").sdistinct, df.sdiff("distance"))
+   * }}}
+   *
+   * @since skyline v0.0.1
+   */
+  def sdiff(expr: String, distinct: String = "nondistinct"): Column =
+    Column(
+      SkylineItemOptions.createSkylineItemOptions(
+        isSkylineDistinct(distinct), Column(expr).expr, SkylineDiff
+      )
+    )
+
+  /**
+   * Auxiliary helper function for distinguishing strings for distinct skyline dimensions.
+   *
+   * Will return true if and only if "distinct" was specified (case-insensitively).
+   * Will return false if and only if "nondistinct" was specified (case-insensitively).
+   * Will throw `IllegalArgumentException` in all other cases.
+   *
+   * @param distinct String representation of distinctiveness of skyline dimension
+   * @return whether or not the skyline dimension is distinct
+   *
+   * @since skyline v0.0.1
+   */
+  private def isSkylineDistinct(distinct : String) : Boolean = {
+    if (distinct.equalsIgnoreCase("distinct")) {
+      true
+    } else if (distinct.equalsIgnoreCase("nondistinct")) {
+      false
+    } else {
+      throw new IllegalArgumentException(
+        s"""
+           | Illegal value for distinctiveness of skyline detected.
+           | Each dimension must be either "distinct" or "nondistinct".
+          """.stripMargin
+      )
+    }
+  }
 
  /**
   * Define (named) metrics to observe on the Dataset. This method returns an 'observed' Dataset

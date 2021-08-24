@@ -1407,6 +1407,95 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
     orderBy = sort
 
+    def skyline(self, *cols, **kwargs):
+        """Returns a new :class:`DataFrame` containing the skyline with according to the specified dimensions.
+
+        .. versionadded:: skyline_v0.0.1
+
+        Parameters
+        ----------
+        :param cols: str, list, or :class:`Column` for each skyline dimension
+        :param kwargs: (optional) specifications for minMaxDiff and distinct
+        as :class:`str` and :class:`Boolean or :class:`Int` respectively
+
+        Return Value
+        ------------
+        :return: a :class:`DataFrame` containing the results of the skyline query
+
+        Examples
+        --------
+        Skylines using colmnal specifications
+        >>> df.skyline(df.price.smin()).collect()
+        >>> df.skyline(df.price.smin(), df.distance.smin()).collect()
+        >>> df.skyline(df.price.smin().sdistinct(), df.distance.smin()).collect()
+        Same skylines using parameters
+        >>> df.skyline("price", minMaxDiff="min").collect()
+        >>> df.skyline(["price", "distance"], minMaxDiff=["min", "min"]).collect()
+        >>> df.skyline(["price", "distance"], minMaxDiff=["min", "min"], distinct=[1,0]).collect()
+        """
+        skyline = self._skyline(cols, kwargs)
+        jdf = self._jdf.skyline(skyline)
+        return DataFrame(jdf, self.sql_ctx)
+
+    def _skyline(self, cols, kwargs):
+        """Internal skyline processing handling different data types
+
+        Parameters
+        ----------
+        :param cols: str, list, or :class:`Column` for each skyline dimension
+        :param kwargs:  (optional) specifications for minMaxDiff and distinct
+                        as :class:`str` and :class:`Boolean or :class:`Int` respectively
+
+        Return Value
+        ------------
+        :return:    a sequence of columns containing the specifications for each skyline dimension
+                    purely columnar representation without any remaining string or other parameters
+        """
+        if not cols:
+            raise ValueError("should be skyline by at least one column")
+
+        if len(cols) == 1 and isinstance(cols[0], list):
+            cols = cols[0]
+
+        jcols = [_to_java_column(c) for c in cols]
+
+        if (kwargs):
+            distinct = kwargs.get('distinct', False)
+            minMaxDiff = kwargs.get('minMaxDiff', "min")
+        else:
+            distinct = False
+            minMaxDiff = ()
+
+        if isinstance(minMaxDiff, str) and minMaxDiff and minMaxDiff.strip():
+            if minMaxDiff.strip().lower() == "min":
+                jcols = [ jc.smin() for jc in jcols ]
+            elif minMaxDiff.strip().lower() == "max":
+                jcols = [ jc.smax() for jc in jcols ]
+            elif minMaxDiff.strip().lower() == "diff":
+                jcols = [ jc.sdiff() for jc in jcols ]
+            else:
+                raise TypeError("only smin/smax/sdiff allowed for skyline, but got %s" % str)
+        elif isinstance(minMaxDiff, list):
+            for item in minMaxDiff:
+                if item.strip().lower() != "min" and item.strip().lower() != "max" and item.strip().lower() != "diff":
+                    raise TypeError("only min/max/diff allowed for skyline, but got %s" % item)
+
+            jcols = [ jc.smin() if mmd.strip().lower() == "min"
+                      else jc.smax() if mmd.strip().lower() == "max"
+                      else jc.sdiff()
+                      for mmd, jc in zip(minMaxDiff, jcols) ]
+
+        if isinstance(distinct, (bool, int)):
+            if distinct:
+                jcols = [jc.sdistinct() for jc in jcols]
+        elif isinstance(distinct, list):
+            jcols = [jc.sdistinct() if dist else jc for dist, jc in zip(distinct, jcols)]
+        else:
+            raise TypeError("distinct can only be boolean or list, but got %s" % type(distinct))
+
+        return self._jseq(jcols)
+
+
     def _jseq(self, cols, converter=None):
         """Return a JVM Seq of Columns from a list of Column or names"""
         return _to_seq(self.sql_ctx._sc, cols, converter)
@@ -1441,6 +1530,9 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                      for asc, jc in zip(ascending, jcols)]
         else:
             raise TypeError("ascending can only be boolean or list, but got %s" % type(ascending))
+
+        print(f"type {type(self._jseq(jcols))} of {jcols}")
+
         return self._jseq(jcols)
 
     def describe(self, *cols):

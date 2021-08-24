@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.expressions.skyline.SkylineOperator
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, JoinSelectionHelper, NormalizeFloatingNumbers}
 import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans._
@@ -213,7 +214,30 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           createBroadcastHashJoin(false)
             .orElse {
               if (!conf.preferSortMergeJoin) {
-                createShuffleHashJoin(false)
+                createShuffleHashJoin(
+  /**
+   * Generate the Java source code to process the rows from child SparkPlan. This should only be
+   * called from `consume`.
+   *
+   * This should be override by subclass to support codegen.
+   *
+   * Note: The operator should not assume the existence of an outer processing loop,
+   *       which it can jump from with "continue;"!
+   *
+   * For example, filter could generate this:
+   *   # code to evaluate the predicate expression, result is isNull1 and value2
+   *   if (!isNull1 && value2) {
+   *     # call consume(), which will call parent.doConsume()
+   *   }
+   *
+   * Note: A plan can either consume the rows as UnsafeRow (row), or a list of variables (input).
+   *       When consuming as a listing of variables, the code to produce the input is already
+   *       generated and `CodegenContext.currentVars` is already set. When consuming as UnsafeRow,
+   *       implementations need to put `row.code` in the generated code and set
+   *       `CodegenContext.INPUT_ROW` manually. Some plans may need more tweaks as they have
+   *       different inputs(join build side, aggregate buffer, etc.), or other special cases.
+   */
+  false)
               } else {
                 None
               }
@@ -718,6 +742,8 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         throw new UnsupportedOperationException(s"MERGE INTO TABLE is not supported temporarily.")
       case logical.CollectMetrics(name, metrics, child) =>
         execution.CollectMetricsExec(name, metrics, planLater(child)) :: Nil
+      case SkylineOperator(skylineItemOptions, child) =>
+        execution.skyline.SkylineExec(skylineItemOptions, planLater(child)) :: Nil
       case _ => Nil
     }
   }

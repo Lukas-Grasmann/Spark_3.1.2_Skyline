@@ -33,6 +33,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogStorageFormat, FunctionResource, FunctionResourceType}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{First, Last}
+import org.apache.spark.sql.catalyst.expressions.skyline._
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -161,6 +162,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
         ctx.aggregationClause,
         ctx.havingClause,
         ctx.windowClause,
+        ctx.skylineClause,
         plan
       )
     }
@@ -607,6 +609,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
       ctx.aggregationClause,
       ctx.havingClause,
       ctx.windowClause,
+      ctx.skylineClause,
       from
     )
   }
@@ -700,6 +703,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
       aggregationClause: AggregationClauseContext,
       havingClause: HavingClauseContext,
       windowClause: WindowClauseContext,
+      skylineClause: SkylineClauseContext,
       relation: LogicalPlan): LogicalPlan = withOrigin(ctx) {
     // Add lateral views.
     val withLateralView = lateralView.asScala.foldLeft(relation)(withGenerate)
@@ -752,8 +756,11 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
     // Window
     val withWindow = withDistinct.optionalMap(windowClause)(withWindowClause)
 
+    // SKYLINE
+    val withSkyline = withWindow.optionalMap(skylineClause)(withSkylineClause)
+
     // Hint
-    selectClause.hints.asScala.foldRight(withWindow)(withHints)
+    selectClause.hints.asScala.foldRight(withSkyline)(withHints)
   }
 
   /**
@@ -887,6 +894,64 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
       }
       Aggregate(mappedGroupByExpressions, selectExpressions, query)
     }
+  }
+
+  /**
+   * Add a skyline operator ([[SkylineOperator]]) to the logical plan.
+   */
+  private def withSkylineClause(
+    ctx: SkylineClauseContext,
+    query: LogicalPlan): LogicalPlan = withOrigin(ctx) {
+
+    // convert Java list of skyline items from context to scala list
+    val skylineItems = ctx.skylineItems.asScala
+
+    SkylineOperator(
+      // map skyline items to [[SkylineItemOptions]] that can be used in logical plan
+      skylineItems.map(visitSkylineItems).toSeq,
+      // set (single) child
+      query
+    )
+  }
+
+  /**
+   * Create a [[SkylineItemOptions]] for a single dimension from the [[SkylineItemOptions]]
+   * provided by the ANTLR parser.
+   *
+   * Contains distinctiveness, epxression (column), and MIN/MAX/DIFF of a single skyline dimension.
+   */
+  private def visitSkylineItems(ctx: SkylineItemContext): SkylineItemOptions = withOrigin(ctx) {
+    val distinct = if (ctx.DISTINCT != null) {
+      // skyline dimension is distinct
+      SkylineIsDistinct
+    } else {
+      // skyline dimension is NOT distinct
+      // when parsing from query string, no specifying "DISTINCT" is equal to NOT distinct
+      SkylineIsNotDistinct
+    }
+
+    val minMaxDiff = if (ctx.MIN != null) {
+      // skyline dimension minimization
+      SkylineMin
+    } else if (ctx.MAX != null) {
+      // skyline dimension maximization
+      SkylineMax
+    } else if (ctx.DIFF != null) {
+      // skyline dimension differenc
+      SkylineDiff
+    } else {
+      // fail silently upon exhaustion
+      // non-typical behaviour that assumes min as standard
+      // SHOULD NEVER CALLED OR RELIED ON
+      SkylineMin
+    }
+
+    // return skyline item options
+    SkylineItemOptions(
+      child = expression(ctx.expression),
+      distinct = distinct,
+      minMaxDiff = minMaxDiff
+    )
   }
 
   /**

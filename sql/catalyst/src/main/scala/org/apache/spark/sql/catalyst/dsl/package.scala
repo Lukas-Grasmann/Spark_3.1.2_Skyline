@@ -28,6 +28,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.objects.Invoke
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineItemOptions, SkylineOperator}
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.types._
@@ -394,6 +395,9 @@ package object dsl {
         }
         Aggregate(groupingExprs, aliasedExprs, logicalPlan)
       }
+
+      def skyline(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+        SkylineOperator(skylineItemOptions, logicalPlan)
 
       def having(
           groupingExprs: Expression*)(

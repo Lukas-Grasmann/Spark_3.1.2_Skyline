@@ -500,6 +500,7 @@ fromStatementBody
       aggregationClause?
       havingClause?
       windowClause?
+      skylineClause?
       queryOrganization
     ;
 
@@ -513,7 +514,8 @@ querySpecification
       whereClause?
       aggregationClause?
       havingClause?
-      windowClause?                                                         #regularQuerySpecification
+      windowClause?
+      skylineClause?                                                        #regularQuerySpecification
     ;
 
 transformClause
@@ -940,6 +942,15 @@ frameBound
     | expression boundType=(PRECEDING | FOLLOWING)
     ;
 
+skylineClause
+    : SKYLINE
+      skylineItems+=skylineItem (',' skylineItems+=skylineItem)*
+    ;
+
+skylineItem
+    : skylineDistinct=DISTINCT? skylineItemExpression=expression skylineMinMaxDiff=(MIN | MAX | DIFF)
+    ;
+
 qualifiedNameList
     : qualifiedName (',' qualifiedName)*
     ;
@@ -1057,6 +1068,7 @@ ansiNonReserved
     | DESC
     | DESCRIBE
     | DFS
+    | DIFF
     | DIRECTORIES
     | DIRECTORY
     | DISTRIBUTE
@@ -1107,7 +1119,9 @@ ansiNonReserved
     | MACRO
     | MAP
     | MATCHED
+    | MAX
     | MERGE
+    | MIN
     | MSCK
     | NAMESPACE
     | NAMESPACES
@@ -1162,6 +1176,7 @@ ansiNonReserved
     | SETS
     | SHOW
     | SKEWED
+    | SKYLINE
     | SORT
     | SORTED
     | START
@@ -1285,6 +1300,7 @@ nonReserved
     | DESC
     | DESCRIBE
     | DFS
+    | DIFF
     | DIRECTORIES
     | DIRECTORY
     | DISTINCT
@@ -1351,8 +1367,10 @@ nonReserved
     | LOGICAL
     | MACRO
     | MAP
+    | MAX
     | MATCHED
     | MERGE
+    | MIN
     | MSCK
     | NAMESPACE
     | NAMESPACES
@@ -1416,6 +1434,7 @@ nonReserved
     | SETS
     | SHOW
     | SKEWED
+    | SKYLINE
     | SOME
     | SORT
     | SORTED
@@ -1531,6 +1550,7 @@ DELIMITED: 'DELIMITED';
 DESC: 'DESC';
 DESCRIBE: 'DESCRIBE';
 DFS: 'DFS';
+DIFF: 'DIFF';
 DIRECTORIES: 'DIRECTORIES';
 DIRECTORY: 'DIRECTORY';
 DISTINCT: 'DISTINCT';
@@ -1604,7 +1624,9 @@ LOGICAL: 'LOGICAL';
 MACRO: 'MACRO';
 MAP: 'MAP';
 MATCHED: 'MATCHED';
+MAX: 'MAX';
 MERGE: 'MERGE';
+MIN: 'MIN';
 MSCK: 'MSCK';
 NAMESPACE: 'NAMESPACE';
 NAMESPACES: 'NAMESPACES';
@@ -1673,6 +1695,7 @@ SETMINUS: 'MINUS';
 SETS: 'SETS';
 SHOW: 'SHOW';
 SKEWED: 'SKEWED';
+SKYLINE: 'SKYLINE OF';
 SOME: 'SOME';
 SORT: 'SORT';
 SORTED: 'SORTED';

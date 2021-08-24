@@ -136,6 +136,38 @@ def desc(col):
     )
 
 
+@since(3.1)
+def smin(col):
+    return (
+        col.smin() if isinstance(col, Column)
+        else _invoke_function("smin", col)
+    )
+
+
+@since(3.1)
+def smax(col):
+    return (
+        col.smax() if isinstance(col, Column)
+        else _invoke_function("smax", col)
+    )
+
+
+@since(3.1)
+def sdiff(col):
+    return (
+        col.sdiff() if isinstance(col, Column)
+        else _invoke_function("sdiff", col)
+    )
+
+
+@since(3.1)
+def sdistinct(col):
+    return (
+        col.sdistinct() if isinstance(col, Column)
+        else _invoke_function("sdistinct", col)
+    )
+
+
 @since(1.3)
 def sqrt(col):
     """
