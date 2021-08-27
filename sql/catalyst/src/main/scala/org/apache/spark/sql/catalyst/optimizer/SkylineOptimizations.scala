@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import org.apache.spark.sql.catalyst.expressions.skyline.SkylineOperator
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineOperator}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
 
@@ -27,12 +27,30 @@ import org.apache.spark.sql.catalyst.rules.Rule
  */
 final class SkylineOptimizations private { }
 
+/**
+ * Optimizer rule for removing skylines without any relevant dimensions.
+ * This is caused i.e. by calling df.skyline() using the DataFrame/DataSet API.
+ */
+object RemoveEmptySkylines extends Rule[LogicalPlan] {
+  override def apply(plan: LogicalPlan): LogicalPlan = plan transformUp removeEmptySkylines
+
+  private val removeEmptySkylines: PartialFunction[LogicalPlan, LogicalPlan] = {
+    case SkylineOperator(skylineItems, child) if skylineItems.isEmpty =>
+      child
+    case s @ SkylineOperator(_, _) => s
+  }
+}
+
+/**
+ * Optimizer rule for removing redundant dimension specifications from the skyline.
+ * Uses Scala built-in .distinct() function on the [[SkylineItemOptions]].
+ */
 object RemoveRedundantSkylineDimensions extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transform removeRedundantDimensions
 
   private val removeRedundantDimensions: PartialFunction[LogicalPlan, LogicalPlan] = {
-    case s @ SkylineOperator(skylineItems, _) if skylineItems.nonEmpty =>
-      SkylineOperator(skylineItems.distinct, s.child)
+    case SkylineOperator(skylineItems, child) if skylineItems.nonEmpty =>
+      SkylineOperator(skylineItems.distinct, child)
     case s @ SkylineOperator(_, _) => s
   }
 }

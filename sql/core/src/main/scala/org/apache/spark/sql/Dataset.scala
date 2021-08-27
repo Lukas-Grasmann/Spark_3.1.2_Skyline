@@ -1930,6 +1930,7 @@ class Dataset[T] private[sql](
    *
    * @since skyline v0.0.1
    */
+  @scala.annotation.varargs
   def skyline(expr: (String, String), exprs: (String, String)*): DataFrame =
     skylineInternal((false, expr._1, expr._2), exprs.map(f => (false, f._1, f._2)): _*)
 
@@ -1944,6 +1945,7 @@ class Dataset[T] private[sql](
    *
    * @since skyline v0.0.1
    */
+  @scala.annotation.varargs
   def skyline(
     expr: (String, String, String),
     exprs: (String, String, String)*
@@ -1998,9 +2000,10 @@ class Dataset[T] private[sql](
    *
    * @since skyline v0.0.1
    */
-  def skyline(expr: Column, exprs: Column*): DataFrame = withPlan {
+  @scala.annotation.varargs
+  def skyline(exprs: Column*): DataFrame = withPlan {
     SkylineOperator(
-      (expr +: exprs).map(
+      (exprs).map(
         f => {
           f.expr match {
             case SkylineItemOptions(child, distinct, minMaxDiff) =>
@@ -2008,8 +2011,8 @@ class Dataset[T] private[sql](
             case _ =>
               throw new IllegalArgumentException(
                 s"""
-                | In a skyline, the column and MIN/MAX/DIFF must be specified before DISTINCT.
-                | If not specified otherwise, DISTINCT is assumed to be NOT SET.
+                   | In a skyline, the column and MIN/MAX/DIFF must be specified before DISTINCT.
+                   | If not specified otherwise, DISTINCT is assumed to be NOT SET.
                 """.stripMargin
               )
           }

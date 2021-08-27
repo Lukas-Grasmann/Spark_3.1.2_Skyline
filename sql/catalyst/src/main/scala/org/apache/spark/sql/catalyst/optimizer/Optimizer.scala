@@ -88,6 +88,7 @@ abstract class Optimizer(catalogManager: CatalogManager)
         EliminateLimits,
         CombineUnions,
         // Skyline optimizations
+        RemoveEmptySkylines,
         RemoveRedundantSkylineDimensions,
         // Constant folding and strength reduction
         TransposeWindow,
