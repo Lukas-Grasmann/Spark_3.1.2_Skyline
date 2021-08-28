@@ -51,6 +51,7 @@ import org.apache.spark.sql.util.ExecutionListenerManager
  * @groupname config Configuration
  * @groupname dataframes Custom DataFrame Creation
  * @groupname dataset Custom Dataset Creation
+ * @groupname skyline Skyline Queries
  * @groupname Ungrouped Support functions for language integrated queries
  * @since 1.0.0
  */

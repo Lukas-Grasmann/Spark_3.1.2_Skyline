@@ -138,6 +138,9 @@ def desc(col):
 
 @since(3.1)
 def smin(col):
+    """
+    Returns a minimization (MIN) dimension for a given skyline.
+    """
     return (
         col.smin() if isinstance(col, Column)
         else _invoke_function("smin", col)
@@ -146,6 +149,9 @@ def smin(col):
 
 @since(3.1)
 def smax(col):
+    """
+    Returns a maximization (MAX) dimension for a given skyline.
+    """
     return (
         col.smax() if isinstance(col, Column)
         else _invoke_function("smax", col)
@@ -154,6 +160,9 @@ def smax(col):
 
 @since(3.1)
 def sdiff(col):
+    """
+    Returns a difference (DIFF) dimension for a given skyline.
+    """
     return (
         col.sdiff() if isinstance(col, Column)
         else _invoke_function("sdiff", col)
@@ -162,6 +171,14 @@ def sdiff(col):
 
 @since(3.1)
 def sdistinct(col):
+    """"
+    Returns a distinct dimension for a skyline.
+    Can only be combined with one of: smin(), smax(), sdiff()
+    Must come AFTER smin(), smax(), sdiff()
+
+    If sdistinct is not used, then the dimension is assumed to be non-distinct.
+    There does not exist a function for non-distinct.
+    """
     return (
         col.sdistinct() if isinstance(col, Column)
         else _invoke_function("sdistinct", col)

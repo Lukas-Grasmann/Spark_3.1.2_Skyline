@@ -95,6 +95,7 @@ SELECT age, name FROM person CLUSTER BY age;
 * [WHERE Clause](sql-ref-syntax-qry-select-where.html)
 * [GROUP BY Clause](sql-ref-syntax-qry-select-groupby.html)
 * [HAVING Clause](sql-ref-syntax-qry-select-having.html)
+* [SKYLINE OF Clause](sql-ref-syntax-qry-select-skylineof.html)
 * [ORDER BY Clause](sql-ref-syntax-qry-select-orderby.html)
 * [SORT BY Clause](sql-ref-syntax-qry-select-sortby.html)
 * [DISTRIBUTE BY Clause](sql-ref-syntax-qry-select-distribute-by.html)

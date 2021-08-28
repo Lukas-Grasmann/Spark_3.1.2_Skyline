@@ -48,6 +48,7 @@ SELECT [ hints , ... ] [ ALL | DISTINCT ] { [ [ named_expression | regex_column_
     [ WHERE boolean_expression ]
     [ GROUP BY expression [ , ... ] ]
     [ HAVING boolean_expression ]
+    [ SKYLINE OF [ DISTINCT ] { expression { MIN | MAX | DIFF } [ , ... ] } ]
 ```
 
 ### Parameters
@@ -111,6 +112,19 @@ SELECT [ hints , ... ] [ ALL | DISTINCT ] { [ [ named_expression | regex_column_
      filter rows after the grouping is performed. If HAVING is specified without GROUP BY, it indicates a GROUP BY
      without grouping expressions (global aggregate).
 
+* **SKYLINE OF**
+
+     Specifies the expressions (i.e. dimensions) used for computing the skyline. Must be combined with MIN/MAX/DIFF to
+     specify whether a skyline is minimized (MIN) or maximized (MAX) or whether the values must be different to be
+     part of the skyline (DIFF). Optionally, DISTINCT can be specified to remove duplicates. In case of distinct, beware
+     that the selection of which element is chosen may be completely random.
+
+     The computation of the skyline follows the definitions given in
+     [Stephan Börzsönyi, Donald Kossmann, Konrad Stocker: The Skyline Operator. ICDE 2001: 421-430].
+
+     The skyline is computed on the results of all previously specified parts of the `SELECT` statement (up to and
+     including HAVING) but is computed before ORDER BY and subsequent parts.
+
 * **ORDER BY**
 
      Specifies an ordering of the rows of the complete result set of the query. The output rows are ordered
@@ -173,6 +187,7 @@ SELECT [ hints , ... ] [ ALL | DISTINCT ] { [ [ named_expression | regex_column_
 * [WHERE Clause](sql-ref-syntax-qry-select-where.html)
 * [GROUP BY Clause](sql-ref-syntax-qry-select-groupby.html)
 * [HAVING Clause](sql-ref-syntax-qry-select-having.html)
+* [SKYLINE OF Clause](sql-ref-syntax-qry-select-skyline-of.html)
 * [ORDER BY Clause](sql-ref-syntax-qry-select-orderby.html)
 * [SORT BY Clause](sql-ref-syntax-qry-select-sortby.html)
 * [CLUSTER BY Clause](sql-ref-syntax-qry-select-clusterby.html)

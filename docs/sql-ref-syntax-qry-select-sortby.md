@@ -172,6 +172,7 @@ SELECT /*+ REPARTITION(zip_code) */ name, age, zip_code FROM person
 * [WHERE Clause](sql-ref-syntax-qry-select-where.html)
 * [GROUP BY Clause](sql-ref-syntax-qry-select-groupby.html)
 * [HAVING Clause](sql-ref-syntax-qry-select-having.html)
+* [SKYLINE OF Clause](sql-ref-syntax-qry-select-skylineof.html)
 * [ORDER BY Clause](sql-ref-syntax-qry-select-orderby.html)
 * [CLUSTER BY Clause](sql-ref-syntax-qry-select-clusterby.html)
 * [DISTRIBUTE BY Clause](sql-ref-syntax-qry-select-distribute-by.html)

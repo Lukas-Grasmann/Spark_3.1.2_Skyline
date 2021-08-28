@@ -139,6 +139,7 @@ SELECT * FROM person ORDER BY name ASC, age DESC;
 * [WHERE Clause](sql-ref-syntax-qry-select-where.html)
 * [GROUP BY Clause](sql-ref-syntax-qry-select-groupby.html)
 * [HAVING Clause](sql-ref-syntax-qry-select-having.html)
+* [SKYLINE OF Clause](sql-ref-syntax-qry-select-skylineof.html)
 * [SORT BY Clause](sql-ref-syntax-qry-select-sortby.html)
 * [CLUSTER BY Clause](sql-ref-syntax-qry-select-clusterby.html)
 * [DISTRIBUTE BY Clause](sql-ref-syntax-qry-select-distribute-by.html)

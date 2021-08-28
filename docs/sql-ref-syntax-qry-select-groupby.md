@@ -291,6 +291,7 @@ SELECT FIRST(age IGNORE NULLS), LAST(id), SUM(id) FROM person;
 * [SELECT Main](sql-ref-syntax-qry-select.html)
 * [WHERE Clause](sql-ref-syntax-qry-select-where.html)
 * [HAVING Clause](sql-ref-syntax-qry-select-having.html)
+* [SKYLINE OF Clause](sql-ref-syntax-qry-select-skylineof.html)
 * [ORDER BY Clause](sql-ref-syntax-qry-select-orderby.html)
 * [SORT BY Clause](sql-ref-syntax-qry-select-sortby.html)
 * [CLUSTER BY Clause](sql-ref-syntax-qry-select-clusterby.html)

@@ -152,7 +152,9 @@
                   url: sql-ref-syntax-qry-select-groupby.html
                 - text: HAVING Clause 
                   url: sql-ref-syntax-qry-select-having.html
-                - text: ORDER BY Clause 
+                - text: SKYLINE OF Clause
+                  url: sql-ref-syntax-qry-select-skylineof.html
+                - text: ORDER BY Clause
                   url: sql-ref-syntax-qry-select-orderby.html
                 - text: SORT BY Clause 
                   url: sql-ref-syntax-qry-select-sortby.html

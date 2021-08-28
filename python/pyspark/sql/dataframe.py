@@ -1418,10 +1418,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         :param kwargs: (optional) specifications for minMaxDiff and distinct
         as :class:`str` and :class:`Boolean or :class:`Int` respectively
 
-        Return Value
-        ------------
-        :return: a :class:`DataFrame` containing the results of the skyline query
-
         Examples
         --------
         Skylines using colmnal specifications

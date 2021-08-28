@@ -1911,6 +1911,7 @@ class Dataset[T] private[sql](
    *
    * NOTE: only "distinct" and "nondistinct" are allowed
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   def skyline(
@@ -1928,6 +1929,7 @@ class Dataset[T] private[sql](
    *   df.skyline(("price", "min"), ("distance", "min"))
    * }}}
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   @scala.annotation.varargs
@@ -1943,6 +1945,7 @@ class Dataset[T] private[sql](
    *
    * NOTE: only "distinct" and "nondistinct" are allowed
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   @scala.annotation.varargs
@@ -1998,6 +2001,7 @@ class Dataset[T] private[sql](
    * only signature where non distinct must not be explicitly specified even
    * if not all dimensions are non-distinct
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   @scala.annotation.varargs
@@ -2034,6 +2038,7 @@ class Dataset[T] private[sql](
    * df.skyline(df.smin("price").sdistinct, df.smin("distance"))
    * }}}
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   def smin(expr: String, distinct: String = "nondistinct"): Column =
@@ -2055,6 +2060,7 @@ class Dataset[T] private[sql](
    * df.skyline(df.smax("price").sdistinct, df.smax("distance"))
    * }}}
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   def smax(expr: String, distinct: String = "nondistinct"): Column =
@@ -2076,6 +2082,7 @@ class Dataset[T] private[sql](
    * df.skyline(df.sdiff("price").sdistinct, df.sdiff("distance"))
    * }}}
    *
+   * @group skyline
    * @since skyline v0.0.1
    */
   def sdiff(expr: String, distinct: String = "nondistinct"): Column =
