@@ -1409,28 +1409,50 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
     def skyline(self, *cols, **kwargs):
         """Returns a new :class:`DataFrame` containing the skyline with according to the specified dimensions.
+        Result items of this skyline call ARE NOT distinct.
 
         .. versionadded:: skyline_v0.0.1
 
         Parameters
         ----------
         :param cols: str, list, or :class:`Column` for each skyline dimension
-        :param kwargs: (optional) specifications for minMaxDiff and distinct
-        as :class:`str` and :class:`Boolean or :class:`Int` respectively
+        :param kwargs: (optional) specifications for minMaxDiff as :class:`str`
 
         Examples
         --------
         Skylines using colmnal specifications
         >>> df.skyline(df.price.smin()).collect()
         >>> df.skyline(df.price.smin(), df.distance.smin()).collect()
-        >>> df.skyline(df.price.smin().sdistinct(), df.distance.smin()).collect()
         Same skylines using parameters
         >>> df.skyline("price", minMaxDiff="min").collect()
         >>> df.skyline(["price", "distance"], minMaxDiff=["min", "min"]).collect()
-        >>> df.skyline(["price", "distance"], minMaxDiff=["min", "min"], distinct=[1,0]).collect()
         """
         skyline = self._skyline(cols, kwargs)
         jdf = self._jdf.skyline(skyline)
+        return DataFrame(jdf, self.sql_ctx)
+
+    def skylineDistinct(self, *cols, **kwargs):
+        """Returns a new :class:`DataFrame` containing the skyline with according to the specified dimensions.
+        Result items of this skyline call ARE distinct.
+
+        .. versionadded:: skyline_v0.0.1
+
+        Parameters
+        ----------
+        :param cols: str, list, or :class:`Column` for each skyline dimension
+        :param kwargs: (optional) specifications for minMaxDiff as :class:`str`
+
+        Examples
+        --------
+        Skylines using colmnal specifications
+        >>> df.skylineDistinct(df.price.smin()).collect()
+        >>> df.skylineDistinct(df.price.smin(), df.distance.smin()).collect()
+        Same skylines using parameters
+        >>> df.skylineDistinct("price", minMaxDiff="min").collect()
+        >>> df.skylineDistinct(["price", "distance"], minMaxDiff=["min", "min"]).collect()
+        """
+        skyline = self._skyline(cols, kwargs)
+        jdf = self._jdf.skylineDistinct(skyline)
         return DataFrame(jdf, self.sql_ctx)
 
     def _skyline(self, cols, kwargs):
@@ -1456,10 +1478,8 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         jcols = [_to_java_column(c) for c in cols]
 
         if (kwargs):
-            distinct = kwargs.get('distinct', False)
             minMaxDiff = kwargs.get('minMaxDiff', "min")
         else:
-            distinct = False
             minMaxDiff = ()
 
         if isinstance(minMaxDiff, str) and minMaxDiff and minMaxDiff.strip():
@@ -1480,14 +1500,6 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
                       else jc.smax() if mmd.strip().lower() == "max"
                       else jc.sdiff()
                       for mmd, jc in zip(minMaxDiff, jcols) ]
-
-        if isinstance(distinct, (bool, int)):
-            if distinct:
-                jcols = [jc.sdistinct() for jc in jcols]
-        elif isinstance(distinct, list):
-            jcols = [jc.sdistinct() if dist else jc for dist, jc in zip(distinct, jcols)]
-        else:
-            raise TypeError("distinct can only be boolean or list, but got %s" % type(distinct))
 
         return self._jseq(jcols)
 

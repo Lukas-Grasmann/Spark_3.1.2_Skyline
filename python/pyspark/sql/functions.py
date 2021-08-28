@@ -169,22 +169,6 @@ def sdiff(col):
     )
 
 
-@since(3.1)
-def sdistinct(col):
-    """"
-    Returns a distinct dimension for a skyline.
-    Can only be combined with one of: smin(), smax(), sdiff()
-    Must come AFTER smin(), smax(), sdiff()
-
-    If sdistinct is not used, then the dimension is assumed to be non-distinct.
-    There does not exist a function for non-distinct.
-    """
-    return (
-        col.sdistinct() if isinstance(col, Column)
-        else _invoke_function("sdistinct", col)
-    )
-
-
 @since(1.3)
 def sqrt(col):
     """

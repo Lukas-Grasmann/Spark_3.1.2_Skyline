@@ -944,11 +944,12 @@ frameBound
 
 skylineClause
     : SKYLINE
+      skylineDistinct=DISTINCT?
       skylineItems+=skylineItem (',' skylineItems+=skylineItem)*
     ;
 
 skylineItem
-    : skylineDistinct=DISTINCT? skylineItemExpression=expression skylineMinMaxDiff=(MIN | MAX | DIFF)
+    : skylineItemExpression=expression skylineMinMaxDiff=(MIN | MAX | DIFF)
     ;
 
 qualifiedNameList

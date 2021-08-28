@@ -21,10 +21,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, PredicateHelper}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
-import org.apache.spark.sql.catalyst.expressions.skyline.SkylineItemOptions
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineItemOptions}
 import org.apache.spark.sql.execution.{CodegenSupport, ExplainUtils, SparkPlan, UnaryExecNode}
 
 case class SkylineExec(
+  distinct: SkylineDistinct,
   skylineItemOptions: Seq[SkylineItemOptions],
   child: SparkPlan
 ) extends UnaryExecNode with CodegenSupport with PredicateHelper {
@@ -129,7 +130,7 @@ case class SkylineExec(
   override def toString: String = s"""
       | $formattedNodeName
       | ${ExplainUtils.generateFieldString("Input", child.output)}
-      | Skyline dimensions:
-      | ${skylineItemOptions.mkString(",")}
+      | ; Skyline dimensions: ${skylineItemOptions.mkString(", ")}
+      | ; Distinct: ${distinct.distinct}
       |""".stripMargin.split('\n').map(_.trim.filter(_ >= ' ')).mkString
 }

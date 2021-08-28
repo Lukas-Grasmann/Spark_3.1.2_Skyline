@@ -907,6 +907,14 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
     val skylineItems = ctx.skylineItems.asScala
 
     SkylineOperator(
+      if (ctx.DISTINCT != null) {
+        // skyline dimension is distinct
+        SkylineIsDistinct
+      } else {
+        // skyline dimension is NOT distinct
+        // when parsing from query string, no specifying "DISTINCT" is equal to NOT distinct
+        SkylineIsNotDistinct
+      },
       // map skyline items to [[SkylineItemOptions]] that can be used in logical plan
       skylineItems.map(visitSkylineItems).toSeq,
       // set (single) child
@@ -921,15 +929,6 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
    * Contains distinctiveness, epxression (column), and MIN/MAX/DIFF of a single skyline dimension.
    */
   private def visitSkylineItems(ctx: SkylineItemContext): SkylineItemOptions = withOrigin(ctx) {
-    val distinct = if (ctx.DISTINCT != null) {
-      // skyline dimension is distinct
-      SkylineIsDistinct
-    } else {
-      // skyline dimension is NOT distinct
-      // when parsing from query string, no specifying "DISTINCT" is equal to NOT distinct
-      SkylineIsNotDistinct
-    }
-
     val minMaxDiff = if (ctx.MIN != null) {
       // skyline dimension minimization
       SkylineMin
@@ -937,7 +936,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
       // skyline dimension maximization
       SkylineMax
     } else if (ctx.DIFF != null) {
-      // skyline dimension differenc
+      // skyline dimension difference
       SkylineDiff
     } else {
       // fail silently upon exhaustion
@@ -949,7 +948,6 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
     // return skyline item options
     SkylineItemOptions(
       child = expression(ctx.expression),
-      distinct = distinct,
       minMaxDiff = minMaxDiff
     )
   }

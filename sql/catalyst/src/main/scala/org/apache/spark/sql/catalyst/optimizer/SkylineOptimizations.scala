@@ -35,9 +35,9 @@ object RemoveEmptySkylines extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transformUp removeEmptySkylines
 
   private val removeEmptySkylines: PartialFunction[LogicalPlan, LogicalPlan] = {
-    case SkylineOperator(skylineItems, child) if skylineItems.isEmpty =>
+    case SkylineOperator(_, skylineItems, child) if skylineItems.isEmpty =>
       child
-    case s @ SkylineOperator(_, _) => s
+    case s @ SkylineOperator(_, _, _) => s
   }
 }
 
@@ -49,8 +49,8 @@ object RemoveRedundantSkylineDimensions extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transform removeRedundantDimensions
 
   private val removeRedundantDimensions: PartialFunction[LogicalPlan, LogicalPlan] = {
-    case SkylineOperator(skylineItems, child) if skylineItems.nonEmpty =>
-      SkylineOperator(skylineItems.distinct, child)
-    case s @ SkylineOperator(_, _) => s
+    case SkylineOperator(distinct, skylineItems, child) if skylineItems.nonEmpty =>
+      SkylineOperator(distinct, skylineItems.distinct, child)
+    case s @ SkylineOperator(_, _, _) => s
   }
 }

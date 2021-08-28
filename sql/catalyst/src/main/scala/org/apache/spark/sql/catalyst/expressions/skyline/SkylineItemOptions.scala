@@ -51,44 +51,18 @@ case object SkylineDiff extends SkylineMinMaxDiff {
 }
 
 /**
- * Skyline distinctiveness specification
- */
-abstract sealed class SkylineDistinct {
-  def distinct: Boolean
-  def sql: String
-}
-
-/**
- * Skyline DISTINCT specification
- */
-case object SkylineIsDistinct extends SkylineDistinct {
-  def distinct: Boolean = true
-  def sql: String = "DISTINCT"
-}
-
-/**
- * Skyline non-distinct (DISTINCT not set) specification
- */
-case object SkylineIsNotDistinct extends SkylineDistinct {
-  def distinct: Boolean = false
-  def sql: String = ""
-}
-
-/**
  * Skyline item options that hold the specifications for a single skyline dimension.
  *
  * @param child child expression (column/dimension)
- * @param distinct distinctiveness for the given dimension
  * @param minMaxDiff MIN/MAX/DIFF for the given dimension
  */
 case class SkylineItemOptions(
   child: Expression,
-  distinct: SkylineDistinct,
   minMaxDiff: SkylineMinMaxDiff
 ) extends Expression with Unevaluable {
-  override def toString: String = s"${distinct.sql} $child ${minMaxDiff.sql}"
+  override def toString: String = s"$child ${minMaxDiff.sql}"
   override def sql: String =
-    distinct.sql + ( if (distinct.distinct) { " " } ) + child.sql + " " + minMaxDiff.sql
+    child.sql + " " + minMaxDiff.sql
 
   override def nullable: Boolean = child.nullable
 
@@ -115,23 +89,19 @@ object SkylineItemOptions {
 
   /**
    * Create skyline item options using Boolean, Expression, and String.
-   * Conversion from Boolean to [[SkylineDistinct]] performed here.
    * Conversion from String to [[SkylineMinMaxDiff]] performed here.
    *
-   * @param distinct whether the dimension should be distinct
    * @param child child expression/column (NOT to be confused with Column() of Spark SQL,
    *              to use a Spark SQL column use column.expression)
    * @param minMaxDiff string specification of "MIN"/"MAX"/"DIFF" (case-insensitive)
    * @return a new object of [[SkylineItemOptions]]
    */
   def createSkylineItemOptions(
-    distinct: Boolean,
     child: Expression,
     minMaxDiff: String
   ): SkylineItemOptions = {
     SkylineItemOptions(
       child,
-      if (distinct) { SkylineIsDistinct } else { SkylineIsNotDistinct },
       minMaxDiff.toUpperCase(Locale.ROOT) match {
         case MIN => SkylineMin
         case MAX => SkylineMax
@@ -143,49 +113,18 @@ object SkylineItemOptions {
 
   /**
    * Create skyline item options using Boolean, Expression, and [[SkylineMinMaxDiff]].
-   * Conversion from Boolean to [[SkylineDistinct]] performed here.
    *
-   * @param distinct whether the dimension should be distinct
    * @param child child expression/column (NOT to be confused with Column() of Spark SQL,
    *              to use a Spark SQL column use column.expression)
    * @param minMaxDiff skyline MIN/MAX/DIFF specification
    * @return a new object of [[SkylineItemOptions]]
    */
   def createSkylineItemOptions(
-  distinct: Boolean,
   child: Expression,
   minMaxDiff: SkylineMinMaxDiff
   ): SkylineItemOptions = {
     SkylineItemOptions(
       child,
-      if (distinct) { SkylineIsDistinct } else { SkylineIsNotDistinct },
-      minMaxDiff
-    )
-  }
-
-  /**
-   * Create skyline item options using [[SkylineDistinct]], Expression, and [[SkylineMinMaxDiff]].
-   * Pure convenience function with no internal conversions. Equivalence:
-   * {{{
-   * createSkylineItemOptions(distinct, child, minMaxDiff)
-   * // is equivalent to
-   * SkylineItemOptions(child, distinct, minMaxDiff)
-   * }}}
-   *
-   * @param distinct skyline distinctiveness specification
-   * @param child child expression/column (NOT to be confused with Column() of Spark SQL,
-   *              to use a Spark SQL column use column.expression)
-   * @param minMaxDiff skyline MIN/MAX/DIFF specification
-   * @return a new object of [[SkylineItemOptions]]
-   */
-  def createSkylineItemOptions(
-    distinct: SkylineDistinct,
-    child: Expression,
-    minMaxDiff: SkylineMinMaxDiff
-  ): SkylineItemOptions = {
-    SkylineItemOptions(
-      child,
-      distinct,
       minMaxDiff
     )
   }
