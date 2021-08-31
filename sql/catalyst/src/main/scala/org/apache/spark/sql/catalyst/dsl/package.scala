@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.objects.Invoke
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineItemOptions, SkylineOperator}
+import org.apache.spark.sql.catalyst.expressions.skyline._
 import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.types._
@@ -396,8 +396,20 @@ package object dsl {
         Aggregate(groupingExprs, aliasedExprs, logicalPlan)
       }
 
-      def skyline(distinct: SkylineDistinct, skylineItemOptions: SkylineItemOptions*): LogicalPlan =
-        SkylineOperator(distinct, skylineItemOptions, logicalPlan)
+      def skyline(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+        SkylineOperator(SkylineIsNotDistinct, skylineItemOptions, logicalPlan)
+
+      def skylineDistinct(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+        SkylineOperator(SkylineIsDistinct, skylineItemOptions, logicalPlan)
+
+      def smin(expr: Expression): SkylineItemOptions =
+        SkylineItemOptions(expr, SkylineMin)
+
+      def smax(expr: Expression): SkylineItemOptions =
+        SkylineItemOptions(expr, SkylineMax)
+
+      def sdiff(expr: Expression): SkylineItemOptions =
+        SkylineItemOptions(expr, SkylineDiff)
 
       def having(
           groupingExprs: Expression*)(
