@@ -35,6 +35,7 @@ import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableS
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.exchange.{REPARTITION, REPARTITION_WITH_NUM, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.python._
+import org.apache.spark.sql.execution.skyline.SkylineUtils
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.execution.streaming.sources.MemoryPlan
 import org.apache.spark.sql.internal.SQLConf
@@ -743,7 +744,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       case logical.CollectMetrics(name, metrics, child) =>
         execution.CollectMetricsExec(name, metrics, planLater(child)) :: Nil
       case SkylineOperator(distinct, skylineItemOptions, child) =>
-        execution.skyline.SkylineExec(distinct, skylineItemOptions, planLater(child)) :: Nil
+        SkylineUtils.planSkyline( distinct, skylineItemOptions, planLater(child) )
       case _ => Nil
     }
   }

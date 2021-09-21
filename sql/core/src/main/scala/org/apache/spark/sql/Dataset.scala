@@ -1911,7 +1911,7 @@ class Dataset[T] private[sql](
    */
   @scala.annotation.varargs
   def skyline(expr: (String, String), exprs: (String, String)*): DataFrame =
-    skylineInternal(distinct = false, expr, exprs.map(f => (f._1, f._2)): _*)
+    skylineInternal(distinct = false, expr, exprs: _*)
 
   /**
    * Skyline for multiple (but at least one) skyline dimensions.
@@ -1926,7 +1926,7 @@ class Dataset[T] private[sql](
    */
   @scala.annotation.varargs
   def skylineDistinct(expr: (String, String), exprs: (String, String)*): DataFrame =
-    skylineInternal(distinct = true, (expr._1, expr._2), exprs.map(f => (f._1, f._2)): _*)
+    skylineInternal(distinct = true, expr, exprs: _*)
 
 
   /**
@@ -1979,17 +1979,14 @@ class Dataset[T] private[sql](
     SkylineOperator.createSkylineOperator(
       distinct = false,
       (exprs).map(
-        f => {
-          f.expr match {
-            case SkylineItemOptions(child, minMaxDiff) =>
-              SkylineItemOptions(child, minMaxDiff)
-            case _ =>
-              throw new IllegalArgumentException(
-                s"""
-                   | Illegal item found in expression. Must be SkylineItemOptions.
+        _.expr match {
+          case s @ SkylineItemOptions(_, _) => s
+          case _ =>
+            throw new IllegalArgumentException(
+              s"""
+                 | Illegal item found in expression. Must be SkylineItemOptions.
                 """.stripMargin
-              )
-          }
+            )
         }
       ),
       logicalPlan
@@ -2013,17 +2010,14 @@ class Dataset[T] private[sql](
     SkylineOperator.createSkylineOperator(
       distinct = true,
       (exprs).map(
-        f => {
-          f.expr match {
-            case SkylineItemOptions(child, minMaxDiff) =>
-              SkylineItemOptions(child, minMaxDiff)
-            case _ =>
-              throw new IllegalArgumentException(
-                s"""
-                   | Illegal item found in expression. Must be SkylineItemOptions.
+        _.expr match {
+          case s @ SkylineItemOptions(_, _) => s
+          case _ =>
+            throw new IllegalArgumentException(
+              s"""
+                 | Illegal item found in expression. Must be SkylineItemOptions.
                 """.stripMargin
-              )
-          }
+            )
         }
       ),
       logicalPlan

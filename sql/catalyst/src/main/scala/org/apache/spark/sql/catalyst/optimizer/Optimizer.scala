@@ -87,9 +87,6 @@ abstract class Optimizer(catalogManager: CatalogManager)
         CombineFilters,
         EliminateLimits,
         CombineUnions,
-        // Skyline optimizations
-        RemoveEmptySkylines,
-        RemoveRedundantSkylineDimensions,
         // Constant folding and strength reduction
         TransposeWindow,
         NullPropagation,
@@ -177,6 +174,13 @@ abstract class Optimizer(catalogManager: CatalogManager)
     // to enforce idempotence on it and we change this batch from Once to FixedPoint(1).
     Batch("Subquery", FixedPoint(1),
       OptimizeSubqueries) ::
+    Batch("Skyline", fixedPoint,
+      // Skyline optimizations
+      RemoveEmptySkylines,
+      RemoveRedundantSkylineDimensions,
+      RemoveSingleDimensionalSkylines,
+      // added since the skyline optimization may produce Deduplicates
+      ReplaceDeduplicateWithAggregate) ::
     Batch("Replace Operators", fixedPoint,
       RewriteExceptAll,
       RewriteIntersectAll,
