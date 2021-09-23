@@ -915,6 +915,11 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
         // when parsing from query string, no specifying "DISTINCT" is equal to NOT distinct
         SkylineIsNotDistinct
       },
+      if (ctx.COMPLETE != null) {
+        SkylineIsComplete
+      } else {
+        SkylineUnspecifiedCompleteness
+      },
       // map skyline items to [[SkylineItemOptions]] that can be used in logical plan
       skylineItems.map(visitSkylineItems).toSeq,
       // set (single) child

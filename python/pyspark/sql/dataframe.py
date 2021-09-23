@@ -1444,7 +1444,7 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
 
         Examples
         --------
-        Skylines using colmnal specifications
+        Skylines using columnar specifications
         >>> df.skylineDistinct(df.price.smin()).collect()
         >>> df.skylineDistinct(df.price.smin(), df.distance.smin()).collect()
         Same skylines using parameters
@@ -1453,6 +1453,56 @@ class DataFrame(PandasMapOpsMixin, PandasConversionMixin):
         """
         skyline = self._skyline(cols, kwargs)
         jdf = self._jdf.skylineDistinct(skyline)
+        return DataFrame(jdf, self.sql_ctx)
+
+    def skylineComplete(self, *cols, **kwargs):
+        """Returns a new :class:`DataFrame` containing the skyline with according to the specified dimensions.
+        Result items of this skyline call ARE NOT distinct.
+        Forces Spark to assume that all inputs are complete and chose the skyline algorithm accordingly.
+
+        .. versionadded:: skyline_v0.0.1
+
+        Parameters
+        ----------
+        :param cols: str, list, or :class:`Column` for each skyline dimension
+        :param kwargs: (optional) specifications for minMaxDiff as :class:`str`
+
+        Examples
+        --------
+        Skylines using columnar specifications
+        >>> df.skylineComplete(df.price.smin()).collect()
+        >>> df.skylineComplete(df.price.smin(), df.distance.smin()).collect()
+        Same skylines using parameters
+        >>> df.skylineComplete("price", minMaxDiff="min").collect()
+        >>> df.skylineComplete(["price", "distance"], minMaxDiff=["min", "min"]).collect()
+        """
+        skyline = self._skyline(cols, kwargs)
+        jdf = self._jdf.skylineComplete(skyline)
+        return DataFrame(jdf, self.sql_ctx)
+
+    def skylineDistinctComplete(self, *cols, **kwargs):
+        """Returns a new :class:`DataFrame` containing the skyline with according to the specified dimensions.
+        Result items of this skyline call ARE distinct.
+        Forces Spark to assume that all inputs are complete and chose the skyline algorithm accordingly.
+
+        .. versionadded:: skyline_v0.0.1
+
+        Parameters
+        ----------
+        :param cols: str, list, or :class:`Column` for each skyline dimension
+        :param kwargs: (optional) specifications for minMaxDiff as :class:`str`
+
+        Examples
+        --------
+        Skylines using columnar specifications
+        >>> df.skylineDistinctComplete(df.price.smin()).collect()
+        >>> df.skylineDistinctComplete(df.price.smin(), df.distance.smin()).collect()
+        Same skylines using parameters
+        >>> df.skylineDistinctComplete("price", minMaxDiff="min").collect()
+        >>> df.skylineDistinctComplete(["price", "distance"], minMaxDiff=["min", "min"]).collect()
+        """
+        skyline = self._skyline(cols, kwargs)
+        jdf = self._jdf.skylineDistinctComplete(skyline)
         return DataFrame(jdf, self.sql_ctx)
 
     def _skyline(self, cols, kwargs):

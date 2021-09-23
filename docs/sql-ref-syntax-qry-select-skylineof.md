@@ -29,7 +29,7 @@ clause.
 ### Syntax
 
 ```sql
-SKYLINE OF [ DISTINCT ] { expression { MIN, MAX, DIFF } [ , ... ] }
+[ COMPLETE ] SKYLINE OF [ DISTINCT ] { expression { MIN | MAX | DIFF } [ , ... ] }
 ```
 
 ### Parameters
@@ -43,6 +43,14 @@ SKYLINE OF [ DISTINCT ] { expression { MIN, MAX, DIFF } [ , ... ] }
 * **expression**
 
   Specifies an expression that represents a skyline dimension. Typically is a column but may also be an alias or similar.
+
+* **COMPLETE**
+
+  Specified that a given skyline does not contain missing values i.e. no null values.
+  This forces Spark to use algorithms under the assumption that no missing values are present even if columns are nullable.
+  ***WILL PRODUCE UNEXPECTED RESULTS IF NULL VALUES ARE ENCOUNTERED***
+  The appropriate complete or incomplete algorithm will be chosen automatically if option is not specified based on nullability.
+  Performance of incomplete algorithms may be inferior to complete algorithms on complete inputs but the output is correct regardless.
 
 * **DISTINCT**
 

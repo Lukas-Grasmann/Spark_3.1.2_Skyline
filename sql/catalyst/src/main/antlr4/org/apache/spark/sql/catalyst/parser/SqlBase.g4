@@ -943,7 +943,8 @@ frameBound
     ;
 
 skylineClause
-    : SKYLINE
+    : skylineComplete=COMPLETE?
+      SKYLINE
       skylineDistinct=DISTINCT?
       skylineItems+=skylineItem (',' skylineItems+=skylineItem)*
     ;
@@ -1054,6 +1055,7 @@ ansiNonReserved
     | COMMIT
     | COMPACT
     | COMPACTIONS
+    | COMPLETE
     | COMPUTE
     | CONCATENATE
     | COST
@@ -1280,6 +1282,7 @@ nonReserved
     | COMMIT
     | COMPACT
     | COMPACTIONS
+    | COMPLETE
     | COMPUTE
     | CONCATENATE
     | CONSTRAINT
@@ -1529,6 +1532,7 @@ COMMENT: 'COMMENT';
 COMMIT: 'COMMIT';
 COMPACT: 'COMPACT';
 COMPACTIONS: 'COMPACTIONS';
+COMPLETE: 'COMPLETE';
 COMPUTE: 'COMPUTE';
 CONCATENATE: 'CONCATENATE';
 CONSTRAINT: 'CONSTRAINT';

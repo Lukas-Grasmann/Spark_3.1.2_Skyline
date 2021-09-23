@@ -77,34 +77,41 @@ case object TotalDomination extends DominanceResult {}
  */
 case object TotalAntiDomination extends DominanceResult {}
 
-sealed class DominanceUtils private () {}
+sealed class DominanceUtils private() {}
 
 /**
  * Object singleton that holds the utilities for checking dominance.
  */
-object DominanceUtils extends Logging{
+object DominanceUtils extends Logging {
   /**
-   * Check dominance for two rows ``rowA`` and ``rowB`` of '''the same''' schema.
+   * Check dominance for two rows ```rowA``` and ```rowB``` of '''the same''' schema.
+   *
    * Skyline dimensions are represented as list of ordinals of the column/dimension
    * and a list of [[SkylineMinMaxDiff]].
-   * The lists ``ordinals`` and ``minMaxDiff`` must have the same length.
+   * The lists ```ordinals``` and ```minMaxDiff``` must have the same length.
    *
-   * @param rowA the row representing the first tuple
-   * @param rowB the row representing the second tuple
-   * @param schema the FULL schema of BOTH tuples (NOT only skyline dimensions)
-   * @param ordinals the ordinals/positions of the skyline dimensions/columns
+   * The parameter ```skipNullValues``` specifies how null values are handled. If
+   * it is ```false``` then all dimensions are considered regardless whether a value might
+   * be null or not. If it is ```true``` then all dimensions are skipped where at least
+   * one of the values for the dimension in ```rowA``` or ```rowB``` is null.
+   *
+   * @param rowA       the row representing the first tuple
+   * @param rowB       the row representing the second tuple
+   * @param schema     the FULL schema of BOTH tuples (NOT only skyline dimensions)
+   * @param ordinals   the ordinals/positions of the skyline dimensions/columns
    * @param minMaxDiff the type of skyline (MIN/MAX/DIFF) for each skyline dimension
+   * @param skipNullValues  switch indicating whether null values are skipped
    * @return a [[DominanceResult]] that gives the dominance for the tuples
-   *         from the "perspective" of ``rowA``
+   *         from the "perspective" of ```rowA```
    */
   def checkRowDominance(
-   rowA: InternalRow,
-   rowB: InternalRow,
-   schema: Seq[AbstractDataType],
-   ordinals: Seq[Int],
-   minMaxDiff: Seq[SkylineMinMaxDiff]
+    rowA: InternalRow,
+    rowB: InternalRow,
+    schema: Seq[AbstractDataType],
+    ordinals: Seq[Int],
+    minMaxDiff: Seq[SkylineMinMaxDiff],
+    skipNullValues: Boolean
   ): DominanceResult = {
-
     // require that all input lists have the same length
     require(ordinals.length == minMaxDiff.length)
 
@@ -119,120 +126,124 @@ object DominanceUtils extends Logging{
       // get ordinal as well as index in list of skyline dimensions
       val (ord, idx) = (f._1, f._2)
 
-      // switch according to data type provided
-      schema(ord) match {
-        case ByteType | ShortType | IntegerType =>
-          // Integral Types (excluding Long)
-          val (valA, valB) = if (schema(ord) == ByteType) {
-            (rowA.getByte(ord).toInt, rowB.getByte(ord).toInt)
-          } else if (schema(ord) == ShortType) {
-            (rowA.getShort(ord).toInt, rowB.getShort(ord).toInt)
-          } else {
-            (rowA.getInt(ord), rowB.getInt(ord))
-          }
+      if (skipNullValues && ( rowA.isNullAt(ord) || rowB.isNullAt(ord) ) ) {
+        // skip dimension where at least one is null
+      } else {
+        // switch according to data type provided
+        schema(ord) match {
+          case ByteType | ShortType | IntegerType =>
+            // Integral Types (excluding Long)
+            val (valA, valB) = if (schema(ord) == ByteType) {
+              (rowA.getByte(ord).toInt, rowB.getByte(ord).toInt)
+            } else if (schema(ord) == ShortType) {
+              (rowA.getShort(ord).toInt, rowB.getShort(ord).toInt)
+            } else {
+              (rowA.getInt(ord), rowB.getInt(ord))
+            }
 
-          // check which dimension is better or different
-          minMaxDiff(idx) match {
-            case _@SkylineMin =>
-              if (valA < valB) {
-                a_strictly_better = true
-              }
-              else if (valB < valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineMax =>
-              if (valA > valB) {
-                a_strictly_better = true
-              }
-              else if (valB > valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineDiff =>
-              if (valA != valB) {
-                a_different_b = true
-              }
-          }
-        case LongType =>
-          // Long Type
-          val (valA, valB) = (rowA.getLong(ord), rowB.getLong(ord))
+            // check which dimension is better or different
+            minMaxDiff(idx) match {
+              case _@SkylineMin =>
+                if (valA < valB) {
+                  a_strictly_better = true
+                }
+                else if (valB < valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineMax =>
+                if (valA > valB) {
+                  a_strictly_better = true
+                }
+                else if (valB > valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineDiff =>
+                if (valA != valB) {
+                  a_different_b = true
+                }
+            }
+          case LongType =>
+            // Long Type
+            val (valA, valB) = (rowA.getLong(ord), rowB.getLong(ord))
 
-          // check which dimension is better or different
-          minMaxDiff(idx) match {
-            case _@SkylineMin =>
-              if (valA < valB) {
-                a_strictly_better = true
-              }
-              else if (valB < valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineMax =>
-              if (valA > valB) {
-                a_strictly_better = true
-              }
-              else if (valB > valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineDiff =>
-              if (valA != valB) {
-                a_different_b = true
-              }
-          }
-        case FloatType | DoubleType =>
-          // Floating Point Types
-          val (valA, valB) = if (schema(ord) == FloatType) {
-            (rowA.getFloat(ord).toDouble, rowB.getFloat(ord).toDouble)
-          } else {
-            (rowA.getDouble(ord), rowB.getDouble(ord))
-          }
+            // check which dimension is better or different
+            minMaxDiff(idx) match {
+              case _@SkylineMin =>
+                if (valA < valB) {
+                  a_strictly_better = true
+                }
+                else if (valB < valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineMax =>
+                if (valA > valB) {
+                  a_strictly_better = true
+                }
+                else if (valB > valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineDiff =>
+                if (valA != valB) {
+                  a_different_b = true
+                }
+            }
+          case FloatType | DoubleType =>
+            // Floating Point Types
+            val (valA, valB) = if (schema(ord) == FloatType) {
+              (rowA.getFloat(ord).toDouble, rowB.getFloat(ord).toDouble)
+            } else {
+              (rowA.getDouble(ord), rowB.getDouble(ord))
+            }
 
-          // check which dimension is better or different
-          minMaxDiff(idx) match {
-            case _@SkylineMin =>
-              if (valA < valB) {
-                a_strictly_better = true
-              }
-              else if (valB < valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineMax =>
-              if (valA > valB) {
-                a_strictly_better = true
-              }
-              else if (valB > valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineDiff =>
-              if (valA != valB) {
-                a_different_b = true
-              }
-          }
-        case t@DecimalType =>
-          // Decimal Types (max precision)
-          val (valA, valB) =
-            ( rowA.getDecimal(ord, t.MAX_PRECISION, t.MAX_SCALE),
-              rowB.getDecimal(ord, t.MAX_PRECISION, t.MAX_SCALE)  )
+            // check which dimension is better or different
+            minMaxDiff(idx) match {
+              case _@SkylineMin =>
+                if (valA < valB) {
+                  a_strictly_better = true
+                }
+                else if (valB < valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineMax =>
+                if (valA > valB) {
+                  a_strictly_better = true
+                }
+                else if (valB > valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineDiff =>
+                if (valA != valB) {
+                  a_different_b = true
+                }
+            }
+          case t@DecimalType =>
+            // Decimal Types (max precision)
+            val (valA, valB) =
+              (rowA.getDecimal(ord, t.MAX_PRECISION, t.MAX_SCALE),
+                rowB.getDecimal(ord, t.MAX_PRECISION, t.MAX_SCALE))
 
-          // check which dimension is better or different
-          minMaxDiff(idx) match {
-            case _@SkylineMin =>
-              if (valA < valB) {
-                a_strictly_better = true
-              }
-              else if (valB < valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineMax =>
-              if (valA > valB) {
-                a_strictly_better = true
-              }
-              else if (valB > valA) {
-                b_strictly_better = true
-              }
-            case _@SkylineDiff =>
-              if (valA != valB) {
-                a_different_b = true
-              }
-          }
+            // check which dimension is better or different
+            minMaxDiff(idx) match {
+              case _@SkylineMin =>
+                if (valA < valB) {
+                  a_strictly_better = true
+                }
+                else if (valB < valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineMax =>
+                if (valA > valB) {
+                  a_strictly_better = true
+                }
+                else if (valB > valA) {
+                  b_strictly_better = true
+                }
+              case _@SkylineDiff =>
+                if (valA != valB) {
+                  a_different_b = true
+                }
+            }
+        }
       }
     }
 

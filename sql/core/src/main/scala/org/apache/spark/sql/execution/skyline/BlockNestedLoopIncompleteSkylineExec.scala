@@ -22,39 +22,34 @@ import scala.collection.mutable
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Expression, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.NamedExpression
 import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineItemOptions}
-import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, ClusteredDistribution, Distribution, UnspecifiedDistribution}
+import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, Distribution}
 import org.apache.spark.sql.execution.{AliasAwareOutputPartitioning, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 
 /**
- * Physical plan node for computing a skyline via the Block-Nested-Loop Algorithm.
+ * Physical plan for computing an incomplete skyline via the Block-Nested-Loop algorithm.
+ *
+ * This algorithm is used to compute an incomplete skyline i.e. skylines where some values might
+ * be missing (i.e. null). Since the null values impact the computation of the dominance via
+ * cyclic dominance and the resulting loss of transitivity, we need to modify the algorithm.
+ * A version that does not consider null values can be found in [[BlockNestedLoopSkylineExec]].
  *
  * <p>
- * This algorithm can be used for both local and global skylines and has the same output attributes
- * and input attributes. Local and global skylines are distinguished via
- * [[requiredChildDistributionExpressions]] which distributes according to the following cases:
- *
- * <ul>
- *   <li>empty expression list: all tuples to a single node</li>
- *   <li>list of expressions: clustering according to expression</li>
- *   <li>None: unspecified clustering (gives clustering authority to Spark)</li>
- * </ul>
+ *  This algorithm is used exclusively for computing dominance for the global incomplete skyline
+ * operator. It therefore has a child distribution of [[AllTuples]].
  * </p>
  *
  * @param skylineDistinct whether or not the results should be distinct
  *                        with regards to the skyline dimensions
  * @param skylineDimensions list of skyline dimensions as [[SkylineItemOptions]]
- * @param requiredChildDistributionExpressions expressions for the distribution (see above)
  * @param child child node in plan which produces the input for the skyline operator
  */
-case class BlockNestedLoopSkylineExec(
-  skylineDistinct: SkylineDistinct,
-  skylineDimensions: Seq[SkylineItemOptions],
-  requiredChildDistributionExpressions: Option[Seq[Expression]],
-  skipNullValuesInDominance: Boolean,
-  child: SparkPlan
+case class BlockNestedLoopIncompleteSkylineExec(
+ skylineDistinct: SkylineDistinct,
+ skylineDimensions: Seq[SkylineItemOptions],
+ child: SparkPlan
 ) extends BaseSkylineExec with AliasAwareOutputPartitioning with Logging {
 
   override lazy val metrics = Map(
@@ -62,18 +57,7 @@ case class BlockNestedLoopSkylineExec(
 
   override def resultExpressions: Seq[NamedExpression] = child.output
 
-  override def requiredChildDistribution: Seq[Distribution] = {
-    // chose distribution according to the distribution expression
-    // this is comparable to the distribution in Aggregate
-    requiredChildDistributionExpressions match {
-      // if empty list of expressions then everything goes to one node/partition
-      case Some(expression) if expression.isEmpty => AllTuples :: Nil
-      // if expressions where specified then cluster according to expressions
-      case Some(expressions) => ClusteredDistribution(expressions) :: Nil
-      // if None was specified the distribution is unspecified (i.e. automatically chosen)
-      case None => UnspecifiedDistribution :: Nil
-    }
-  }
+  override def requiredChildDistribution: Seq[Distribution] = AllTuples :: Nil
 
   override protected def doExecute(): RDD[InternalRow] = {
     // load metrics
@@ -98,12 +82,11 @@ case class BlockNestedLoopSkylineExec(
       partitionIter.foreach { row =>
         // flag that checks whether the current row is dominated
         var isDominated = false;
-        var breakWindowCheck = false;
 
         // emulate foreach loop using an enumerator
         // additionally break loop if current row is itself dominated
         val iter = blockNestedLoopWindow.iterator
-        while (iter.hasNext && !breakWindowCheck) {
+        while (iter.hasNext) {
           val windowRow = iter.next()
 
           // check dominance for row
@@ -114,7 +97,7 @@ case class BlockNestedLoopSkylineExec(
             childOutputSchema,
             skylineDimensionOrdinals,
             skylineDimensions.map { f => f.minMaxDiff },
-            skipNullValues = skipNullValuesInDominance
+            skipNullValues = true
           )
 
           // check domination result and chose action accordingly
@@ -123,18 +106,14 @@ case class BlockNestedLoopSkylineExec(
               // if the current row dominates another row the row is removed
               blockNestedLoopWindow.remove(windowRow)
             case AntiDomination =>
-              // if the row is itself dominated we do not add it by setting isDominated and
-              // we can stop checking the rest of the window
+              // if the row is itself dominated we do not add it by setting isDominated
               isDominated = true
-              breakWindowCheck = true
-            case Equality =>
-              // when equal in every dimension, we can proceed as if it was dominated for skylines
-              // where DISTINCT was specified
-              // otherwise we can just add it since an equal tuple is already in the skyline
-              if (skylineDistinctBoolean) { isDominated = true }
-              breakWindowCheck = true
-            case Incomparability | _ =>
+            case Equality | Incomparability | _ =>
               // NO ACTION
+              // note that all [[Equality]] results have no effect on the skyline
+              // all true duplicates were already removed in the local skyline
+              // this is due to the fact that true duplicates also have the same null values
+              // and are therefore in the same cluster
           }
         }
 

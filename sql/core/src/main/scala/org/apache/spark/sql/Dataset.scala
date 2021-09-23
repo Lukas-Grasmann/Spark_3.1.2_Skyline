@@ -1911,7 +1911,7 @@ class Dataset[T] private[sql](
    */
   @scala.annotation.varargs
   def skyline(expr: (String, String), exprs: (String, String)*): DataFrame =
-    skylineInternal(distinct = false, expr, exprs: _*)
+    skylineInternal(distinct = false, complete = false, expr, exprs: _*)
 
   /**
    * Skyline for multiple (but at least one) skyline dimensions.
@@ -1926,7 +1926,39 @@ class Dataset[T] private[sql](
    */
   @scala.annotation.varargs
   def skylineDistinct(expr: (String, String), exprs: (String, String)*): DataFrame =
-    skylineInternal(distinct = true, expr, exprs: _*)
+    skylineInternal(distinct = true, complete = false, expr, exprs: _*)
+
+  /**
+   * Skyline for multiple (but at least one) skyline dimensions.
+   * Forces Spark to assume a complete dataset (no missing values) and chose algorithms accordingly.
+   * Skyline IS NOT distinct
+   * {{{
+   *   // df.skyline((...), (...), ...) where each bracket corresponds to a dimension
+   *   df.skyline(("price", "min"), ("distance", "min"))
+   * }}}
+   *
+   * @group skyline
+   * @since skyline v0.0.1
+   */
+  @scala.annotation.varargs
+  def skylineComplete(expr: (String, String), exprs: (String, String)*): DataFrame =
+    skylineInternal(distinct = false, complete = true, expr, exprs: _*)
+
+  /**
+   * Skyline for multiple (but at least one) skyline dimensions.
+   * Forces Spark to assume a complete dataset (no missing values) and chose algorithms accordingly.
+   * Skyline IS distinct
+   * {{{
+   *   // df.skylineDistinct((...), (...), ...) where each bracket corresponds to a dimension
+   *   df.skylineDistinct(("price", "min"), ("distance", "min"))
+   * }}}
+   *
+   * @group skyline
+   * @since skyline v0.0.1
+   */
+  @scala.annotation.varargs
+  def skylineDistinctComplete(expr: (String, String), exprs: (String, String)*): DataFrame =
+    skylineInternal(distinct = true, complete = true, expr, exprs: _*)
 
 
   /**
@@ -1950,11 +1982,13 @@ class Dataset[T] private[sql](
   @scala.annotation.varargs
   private def skylineInternal(
     distinct: Boolean,
+    complete: Boolean,
     expr: (String, String),
     exprs: (String, String)*
   ): DataFrame = withPlan {
     SkylineOperator.createSkylineOperator(
       distinct,
+      complete,
       (expr +: exprs).map(
         f => SkylineItemOptions.createSkylineItemOptions(Column(f._1).expr, f._2)
       ),
@@ -1978,6 +2012,7 @@ class Dataset[T] private[sql](
   def skyline(exprs: Column*): DataFrame = withPlan {
     SkylineOperator.createSkylineOperator(
       distinct = false,
+      complete = false,
       (exprs).map(
         _.expr match {
           case s @ SkylineItemOptions(_, _) => s
@@ -2009,6 +2044,73 @@ class Dataset[T] private[sql](
   def skylineDistinct(exprs: Column*): DataFrame = withPlan {
     SkylineOperator.createSkylineOperator(
       distinct = true,
+      complete = false,
+      (exprs).map(
+        _.expr match {
+          case s @ SkylineItemOptions(_, _) => s
+          case _ =>
+            throw new IllegalArgumentException(
+              s"""
+                 | Illegal item found in expression. Must be SkylineItemOptions.
+                """.stripMargin
+            )
+        }
+      ),
+      logicalPlan
+    )
+  }
+
+  /**
+   * Skyline for multiple dimensions as columns
+   * Forces Spark to assume a complete dataset (no missing values) and chose algorithms accordingly.
+   * Skyline IS NOT distinct
+   * {{{
+   *   // df.skyline(col(...).smin, col(...).smax, col(...).sdiff, ...)
+   *   // where each bracket corresponds to a dimension
+   *   df.skyline(col("price").smin, col("stars").smax)
+   * }}}
+   *
+   * @group skyline
+   * @since skyline v0.0.1
+   */
+  @scala.annotation.varargs
+  def skylineComplete(exprs: Column*): DataFrame = withPlan {
+    SkylineOperator.createSkylineOperator(
+      distinct = false,
+      complete = true,
+      (exprs).map(
+        _.expr match {
+          case s @ SkylineItemOptions(_, _) => s
+          case _ =>
+            throw new IllegalArgumentException(
+              s"""
+                 | Illegal item found in expression. Must be SkylineItemOptions.
+                """.stripMargin
+            )
+        }
+      ),
+      logicalPlan
+    )
+  }
+
+  /**
+   * Skyline for multiple dimensions as columns
+   * Forces Spark to assume a complete dataset (no missing values) and chose algorithms accordingly.
+   * Skyline IS distinct
+   * {{{
+   *   // df.skylineDistinct(col(...).smin, col(...).smax, col(...).sdiff, ...)
+   *   // where each bracket corresponds to a dimension
+   *   df.skylineDistinct(col("price").smin, col("stars").smax)
+   * }}}
+   *
+   * @group skyline
+   * @since skyline v0.0.1
+   */
+  @scala.annotation.varargs
+  def skylineDistinctComplete(exprs: Column*): DataFrame = withPlan {
+    SkylineOperator.createSkylineOperator(
+      distinct = true,
+      complete = true,
       (exprs).map(
         _.expr match {
           case s @ SkylineItemOptions(_, _) => s

@@ -46,14 +46,37 @@ case object SkylineIsNotDistinct extends SkylineDistinct {
 }
 
 /**
+ * Skyline completeness specification
+ */
+abstract sealed class SkylineComplete {
+  def complete: Boolean
+  def sql: String
+}
+
+/**
+ * Skyline complete (COMPLETE set) specification
+ */
+case object SkylineIsComplete extends SkylineComplete {
+  override def complete: Boolean = true
+  override def sql: String = "COMPLETE"
+}
+
+case object SkylineUnspecifiedCompleteness extends SkylineComplete {
+  override def complete: Boolean = false
+  override def sql: String = ""
+}
+
+/**
  * Class that contains a skyline operator for the logical plan.
  *
  * @param distinct Whether or not the skyline is distinct via [[SkylineDistinct]]
+ * @param complete Whether the skyline is complete, incomplete, or neither
  * @param skylineItems Sequence of skyline options (one for each dimension)
  * @param child Child node in logical plan (singular)
  */
 case class SkylineOperator(
   distinct: SkylineDistinct,
+  complete: SkylineComplete,
   skylineItems: Seq[SkylineItemOptions],
   child: LogicalPlan) extends UnaryNode {
 
@@ -67,17 +90,20 @@ case class SkylineOperator(
  */
 object SkylineOperator {
   /**
-   * Create a new [[SkylineOperator]] using boolean distinct, the skyline dimension items,
-   * and the child in the logical plan.
+   * Create a new [[SkylineOperator]] using boolean distinct, boolean complete,
+   * the skyline dimension items, and the child in the logical plan.
    * Conversion from [[Boolean]] to [[SkylineDistinct]] is performed here.
+   * Conversion from [[Boolean]] to [[SkylineComplete]] is performed here.
    *
    * @param distinct Boolean whether or not the items in the skyline are distinct.
+   * @param complete Boolean whether or not the input is complete (no null values)
    * @param skylineItems Sequence of [[SkylineItemOptions]]
    * @param child child logical plan node ([[LogicalPlan]])
    * @return a new object of [[SkylineOperator]]
    */
   def createSkylineOperator(
     distinct: Boolean,
+    complete: Boolean,
     skylineItems: Seq[SkylineItemOptions],
     child: LogicalPlan
   ): SkylineOperator = {
@@ -86,6 +112,11 @@ object SkylineOperator {
         SkylineIsDistinct
       } else {
         SkylineIsNotDistinct
+      },
+      if (complete) {
+        SkylineIsComplete
+      } else {
+        SkylineUnspecifiedCompleteness
       },
       skylineItems,
       child
@@ -97,18 +128,21 @@ object SkylineOperator {
    * and the child in the logical plan.
    * Not conversion performed here. Equivalent to calling the regular constructor.
    *
-   * @param distinct Boolean whether or not the items in the skyline are distinct.
+   * @param distinct Whether or not the items in the skyline are distinct.
+   * @param complete Whether or not the input is complete (no null values)
    * @param skylineItems Sequence of [[SkylineItemOptions]]
    * @param child child logical plan node ([[LogicalPlan]])
    * @return a new object of [[SkylineOperator]]
    */
   def createSkylineOperator(
     distinct: SkylineDistinct,
+    complete: SkylineComplete,
     skylineItems: Seq[SkylineItemOptions],
     child: LogicalPlan
   ): SkylineOperator = {
     SkylineOperator(
       distinct,
+      complete,
       skylineItems,
       child
     )

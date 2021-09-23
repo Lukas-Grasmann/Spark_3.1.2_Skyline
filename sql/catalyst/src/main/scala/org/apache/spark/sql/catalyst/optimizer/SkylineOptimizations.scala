@@ -37,9 +37,9 @@ object RemoveEmptySkylines extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transformUp removeEmptySkylines
 
   private val removeEmptySkylines: PartialFunction[LogicalPlan, LogicalPlan] = {
-    case SkylineOperator(_, skylineItems, child) if skylineItems.isEmpty =>
+    case SkylineOperator(_, _, skylineItems, child) if skylineItems.isEmpty =>
       child
-    case s @ SkylineOperator(_, _, _) => s
+    case s @ SkylineOperator(_, _, _, _) => s
   }
 }
 
@@ -51,9 +51,9 @@ object RemoveRedundantSkylineDimensions extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transform removeRedundantDimensions
 
   private val removeRedundantDimensions: PartialFunction[LogicalPlan, LogicalPlan] = {
-    case SkylineOperator(distinct, skylineItems, child) if skylineItems.nonEmpty =>
-      SkylineOperator(distinct, skylineItems.distinct, child)
-    case s @ SkylineOperator(_, _, _) => s
+    case SkylineOperator(distinct, complete, skylineItems, child) if skylineItems.nonEmpty =>
+      SkylineOperator(distinct, complete, skylineItems.distinct, child)
+    case s @ SkylineOperator(_, _, _, _) => s
   }
 }
 
@@ -79,7 +79,7 @@ object RemoveSingleDimensionalSkylines extends Rule[LogicalPlan] {
     // in case of a SkylineOperator with
     // - a single skyline dimension WHICH IS
     // - either minimized (MIN) or maximized (MAX)
-    case SkylineOperator(distinct, skylineItems, child)
+    case SkylineOperator(distinct, _, skylineItems, child)
       if (
         skylineItems.size == 1
         && (skylineItems.head.minMaxDiff==SkylineMin || skylineItems.head.minMaxDiff==SkylineMax)
@@ -126,7 +126,7 @@ object RemoveSingleDimensionalSkylines extends Rule[LogicalPlan] {
     // in case of a skyline operator with a single dimension AND
     // the dimension is of the DIFF skyline type AND
     // the skyline is distinct
-    case SkylineOperator(_@SkylineIsDistinct, skylineItems, child)
+    case SkylineOperator(_@SkylineIsDistinct, _, skylineItems, child)
       if skylineItems.size == 1 && skylineItems.head.minMaxDiff == SkylineDiff =>
         // since the values should be distinct, we eliminate duplicates using Deduplicate
         // ATTENTION: Deduplicate must be transformed to aggregate by optimizations

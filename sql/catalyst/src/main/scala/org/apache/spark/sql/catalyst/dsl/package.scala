@@ -397,10 +397,24 @@ package object dsl {
       }
 
       def skyline(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
-        SkylineOperator(SkylineIsNotDistinct, skylineItemOptions, logicalPlan)
+        SkylineOperator(
+          SkylineIsNotDistinct, SkylineUnspecifiedCompleteness, skylineItemOptions, logicalPlan
+        )
 
       def skylineDistinct(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
-        SkylineOperator(SkylineIsDistinct, skylineItemOptions, logicalPlan)
+        SkylineOperator(
+          SkylineIsDistinct, SkylineUnspecifiedCompleteness, skylineItemOptions, logicalPlan
+        )
+
+      def skylineComplete(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+        SkylineOperator(
+          SkylineIsNotDistinct, SkylineIsComplete, skylineItemOptions, logicalPlan
+        )
+
+      def skylineDistinctComplete(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+        SkylineOperator(
+          SkylineIsDistinct, SkylineIsComplete, skylineItemOptions, logicalPlan
+        )
 
       def smin(expr: Expression): SkylineItemOptions =
         SkylineItemOptions(expr, SkylineMin)

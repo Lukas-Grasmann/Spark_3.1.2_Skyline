@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.skyline
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineItemOptions}
+import org.apache.spark.sql.catalyst.expressions.{Expression, IsNotNull}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineComplete, SkylineDistinct, SkylineIsComplete, SkylineItemOptions}
 import org.apache.spark.sql.execution.SparkPlan
 
 /**
@@ -39,28 +39,42 @@ object SkylineUtils extends Logging {
      skylineDistinct: SkylineDistinct,
      skylineDimensions: Seq[SkylineItemOptions],
      requiredChildDistributionExpressions: Option[Seq[Expression]],
+     globalSkyline: Boolean,
+     incompleteSkyline: Boolean,
      child: SparkPlan
   ): SparkPlan = {
-    // check whether at least one dimension is nullable
-    val dimensionNullable =
-      skylineDimensions.map{f => f.child.nullable}.fold(false)((a, b) => a && b)
 
-    if (dimensionNullable) {
-      // TODO replace by skyline algorithm that supports null values
+   if (incompleteSkyline && globalSkyline) {
+      BlockNestedLoopIncompleteSkylineExec(
+        skylineDistinct,
+        skylineDimensions,
+        child
+      )
+    } else if (incompleteSkyline) {
+     BlockNestedLoopSkylineExec(
+       skylineDistinct,
+       skylineDimensions,
+       Some(skylineDimensions.map { f => IsNotNull(f.child) }),
+       skipNullValuesInDominance = true,
+       child
+     )
+   } else if (globalSkyline) {
       BlockNestedLoopSkylineExec(
         skylineDistinct,
         skylineDimensions,
-        requiredChildDistributionExpressions,
+        Some(Nil),
+        skipNullValuesInDominance = false,
         child
       )
     } else {
-      BlockNestedLoopSkylineExec(
-        skylineDistinct,
-        skylineDimensions,
-        requiredChildDistributionExpressions,
-        child
-      )
-    }
+     BlockNestedLoopSkylineExec(
+       skylineDistinct,
+       skylineDimensions,
+       requiredChildDistributionExpressions,
+       skipNullValuesInDominance = false,
+       child
+     )
+   }
   }
 
   /**
@@ -73,13 +87,26 @@ object SkylineUtils extends Logging {
    */
   def planSkyline(
      skylineDistinct: SkylineDistinct,
+     skylineComplete: SkylineComplete,
      skylineDimensions: Seq[SkylineItemOptions],
      child: SparkPlan
    ) : Seq[SparkPlan] = {
-    val localSkyline = createSkyline(
+
+    // check whether at least one dimension is nullable
+    val dimensionNullable = skylineComplete match {
+      // treat all dimensions as if they were not nullable
+      case SkylineIsComplete => false
+      // determine whether to treat the dimensions as nullable by checking whether the dimension
+      // is marked as nullable in Spark
+      case _ => skylineDimensions.map{f => f.child.nullable}.fold(false)((a, b) => a || b)
+    }
+
+    val localSkyline: SparkPlan = createSkyline(
       skylineDistinct,
       skylineDimensions,
       None,
+      globalSkyline = false,
+      dimensionNullable,
       child
     )
 
@@ -87,6 +114,8 @@ object SkylineUtils extends Logging {
       skylineDistinct,
       skylineDimensions,
       Some(Nil),
+      globalSkyline = true,
+      dimensionNullable,
       localSkyline
     )
 
