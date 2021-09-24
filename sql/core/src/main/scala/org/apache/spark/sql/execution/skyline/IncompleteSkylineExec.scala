@@ -46,7 +46,7 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
  * @param skylineDimensions list of skyline dimensions as [[SkylineItemOptions]]
  * @param child child node in plan which produces the input for the skyline operator
  */
-case class BlockNestedLoopIncompleteSkylineExec(
+case class IncompleteSkylineExec(
  skylineDistinct: SkylineDistinct,
  skylineDimensions: Seq[SkylineItemOptions],
  child: SparkPlan
@@ -75,20 +75,23 @@ case class BlockNestedLoopIncompleteSkylineExec(
     // execute child and for each partition (corresponding iterator) calculate the skyline
     // in case of [[AllTuples]] there is only exactly one partition (on one node)
     child.execute().mapPartitionsInternal { partitionIter =>
+      // window for holding the entire dataset
+      val datasetWindow = new mutable.HashSet[InternalRow]()
       // window for holding current skyline
-      val blockNestedLoopWindow = new mutable.HashSet[InternalRow]()
+      val resultWindow = new mutable.HashSet[InternalRow]()
 
       // for each row in the partition(-iterator)
       partitionIter.foreach { row =>
+        datasetWindow += row.copy()
+      }
+
+      // for each value in the dataset check dominance
+      datasetWindow.foreach { row =>
         // flag that checks whether the current row is dominated
         var isDominated = false;
 
-        // emulate foreach loop using an enumerator
-        // additionally break loop if current row is itself dominated
-        val iter = blockNestedLoopWindow.iterator
-        while (iter.hasNext) {
-          val windowRow = iter.next()
-
+        // compare with all remaining values in dataset window
+        datasetWindow.foreach { windowRow =>
           // check dominance for row
           // use [[DominanceUtils]] for converting the row and actually checking dominance
           val dominationResult = DominanceUtils.checkRowDominance(
@@ -104,7 +107,7 @@ case class BlockNestedLoopIncompleteSkylineExec(
           dominationResult match {
             case Domination =>
               // if the current row dominates another row the row is removed
-              blockNestedLoopWindow.remove(windowRow)
+              datasetWindow.remove(windowRow)
             case AntiDomination =>
               // if the row is itself dominated we do not add it by setting isDominated
               isDominated = true
@@ -117,18 +120,19 @@ case class BlockNestedLoopIncompleteSkylineExec(
           }
         }
 
-        // only add to window if NOT dominated
         if (!isDominated) {
-          blockNestedLoopWindow += row.copy()
+          resultWindow += row
         }
+        // drop first (= current) element from dataset to prevent multiple checks
+        datasetWindow.drop(1)
       }
 
       // the number of rows after the final iteration is equal to the number of output tuples
       // we consider here that there may be multiple partitions
-      numOutputRows += blockNestedLoopWindow.size
+      numOutputRows += resultWindow.size
       // return the window contents as result using an iterator
       // the handling of the partitioning is done by mapPartitionsInternal
-      blockNestedLoopWindow.toIterator
+      resultWindow.toIterator
     }
   }
 }

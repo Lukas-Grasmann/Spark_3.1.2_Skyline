@@ -45,7 +45,7 @@ object SkylineUtils extends Logging {
   ): SparkPlan = {
 
    if (incompleteSkyline && globalSkyline) {
-      BlockNestedLoopIncompleteSkylineExec(
+      IncompleteSkylineExec(
         skylineDistinct,
         skylineDimensions,
         child
