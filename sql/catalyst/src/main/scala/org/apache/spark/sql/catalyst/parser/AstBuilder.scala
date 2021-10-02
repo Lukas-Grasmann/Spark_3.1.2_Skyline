@@ -921,7 +921,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
         SkylineUnspecifiedCompleteness
       },
       // map skyline items to [[SkylineItemOptions]] that can be used in logical plan
-      skylineItems.map(visitSkylineItems).toSeq,
+      skylineItems.map(visitSkylineItems),
       // set (single) child
       query
     )

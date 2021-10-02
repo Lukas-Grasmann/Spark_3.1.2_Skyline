@@ -25,6 +25,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.catalog._
@@ -33,6 +34,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.SubExprUtils._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.objects._
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineItemOptions, SkylineOperator}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeUpdateFields
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -153,7 +155,8 @@ object AnalysisContext {
  * [[UnresolvedRelation]]s into fully typed objects using information in a [[SessionCatalog]].
  */
 class Analyzer(override val catalogManager: CatalogManager)
-  extends RuleExecutor[LogicalPlan] with CheckAnalysis with LookupCatalog with SQLConfHelper {
+  extends RuleExecutor[LogicalPlan] with CheckAnalysis with LookupCatalog with SQLConfHelper
+    with Logging {
 
   private val v1SessionCatalog: SessionCatalog = catalogManager.v1SessionCatalog
 
@@ -270,6 +273,7 @@ class Analyzer(override val catalogManager: CatalogManager)
       ExtractWindowExpressions ::
       GlobalAggregates ::
       ResolveAggregateFunctions ::
+      PreventPrematureHavingProjection ::
       TimeWindowing ::
       ResolveInlineTables ::
       ResolveHigherOrderFunctions(v1SessionCatalog) ::
@@ -1967,6 +1971,92 @@ class Analyzer(override val catalogManager: CatalogManager)
   }
 
   /**
+   * In case an sorting or skyline is applied after HAVING, the optimization rules for HAVING
+   * introduce a premature [[Project]] (i.e. [[Project]] between the [[Filter]] of the HAVING and
+   * the [[Sort]] or [[SkylineOperator]]).
+   *
+   * To solve this, we move the [[Project]] to the outside of the [[SkylineOperator]] and try to
+   * resolve the missing attributes using [[ResolveAggregateFunctions]].
+   *
+   * I.e., we do the following transformations:
+   *
+   * {{{Sort(_, _, Project(_, Filter(_, Aggregate(_, _, _))))}}}
+   * becomes
+   * {{{Project(_, Sort(_, _, Filter(_, Aggregate(_, _, _))))}}}
+   * where missing attributes may be added to the [[Aggregate]] as necessary.
+   *
+   * {{{SkylineOperator(_, _, _, Project(_, Filter(_, Aggregate(_, _, _))))}}}
+   * becomes
+   * {{{Project(_, SkylineOperator(_, _, _, Filter(_, Aggregate(_, _, _))))}}}
+   * where missing attributes may be added to the [[Aggregate]] as necessary.
+   *
+   * If [[Sort]] and [[SkylineOperator]] are present and the projection was pushed in between we
+   * also resolve the outer [[Sort]] and push the projection further.
+   */
+  object PreventPrematureHavingProjection extends Rule[LogicalPlan] {
+    override def apply(plan: LogicalPlan): LogicalPlan = plan.resolveOperatorsUp {
+      case sort @ Sort(_, _,
+        project @ Project(_,
+          filter @ Filter(_,
+            aggregate @ Aggregate(_, _, _)
+          )
+        )
+      ) if !sort.resolved =>
+        val newSortWithoutFilter = ResolveAggregateFunctions.apply(
+          sort.copy(child = aggregate)
+        ).children.head.asInstanceOf[Sort]
+        val newAggregate = newSortWithoutFilter.child
+
+        project.copy(
+          child = newSortWithoutFilter.copy(
+            child = filter.copy(
+              child = newAggregate
+            )
+          )
+        )
+
+      case skyline @ SkylineOperator(_, _, _,
+         project @ Project(_,
+           filter @ Filter(_,
+            aggregate @ Aggregate(_, _, _)
+           )
+         )
+      ) if !skyline.resolved =>
+        val newSkylineWithoutFilter = ResolveAggregateFunctions.apply(
+          skyline.copy(child = aggregate)
+        ).children.head.asInstanceOf[SkylineOperator]
+        val newAggregate = newSkylineWithoutFilter.child
+
+        project.copy(
+          child = newSkylineWithoutFilter.copy(
+            child = filter.copy(
+              child = newAggregate
+            )
+          )
+        )
+
+      case sort @ Sort(_, _,
+        project @ Project(_,
+          skyline @ SkylineOperator(_, _, _,
+            Filter(_,
+              aggregate @ Aggregate(_, _, _)
+            )
+          )
+        )
+      ) if !sort.resolved =>
+        val newSortWithoutFilter = ResolveAggregateFunctions.apply(
+          sort.copy(child = aggregate)
+        ).children.head.asInstanceOf[Sort]
+
+        project.copy(
+          child = newSortWithoutFilter.copy(
+            child = skyline
+          )
+        )
+    }
+  }
+
+  /**
    * In many dialects of SQL it is valid to sort by attributes that are not present in the SELECT
    * clause.  This rule detects such queries and adds the required attributes to the original
    * projection, so that they will be available during sorting. Another projection is added to
@@ -1978,6 +2068,18 @@ class Analyzer(override val catalogManager: CatalogManager)
     def apply(plan: LogicalPlan): LogicalPlan = plan.resolveOperatorsUp {
       // Skip sort with aggregate. This will be handled in ResolveAggregateFunctions
       case sa @ Sort(_, _, child: Aggregate) => sa
+
+      case s @ SkylineOperator(_, _, skylineItems, child)
+          if (!s.resolved || s.missingInput.nonEmpty) && child.resolved =>
+        val (exprs, newChild) = resolveExprsAndAddMissingAttrs(skylineItems, child)
+        val dimensions = exprs.map(_.asInstanceOf[SkylineItemOptions])
+        if (child.output == newChild.output) {
+          s.copy(skylineItems = dimensions)
+        } else {
+          // add missing attributes and project them away
+          val newSkyline = s.copy(skylineItems = dimensions, child = newChild)
+          Project(child.output, newSkyline)
+        }
 
       case s @ Sort(order, _, child)
           if (!s.resolved || s.missingInput.nonEmpty) && child.resolved =>
@@ -2424,6 +2526,65 @@ class Analyzer(override val catalogManager: CatalogManager)
           // Attempting to resolve in the aggregate can result in ambiguity.  When this happens,
           // just return the original plan.
           case ae: AnalysisException => sort
+        }
+
+      case skyline @ SkylineOperator(distinct, complete, skylineItems, aggregate: Aggregate) =>
+        try {
+          val unresolvedDim = skylineItems.filter { item =>
+            !item.resolved ||
+              !item.references.subsetOf(aggregate.outputSet) ||
+              containsAggregate(item)
+          }
+          val aliasedDimensions = unresolvedDim.map(u => Alias(u.child, "aggSkyline")())
+          val childWithExtraDimension = aggregate.copy(
+            aggregateExpressions = aggregate.aggregateExpressions ++ aliasedDimensions )
+          val resolvedChild: Aggregate =
+            executeSameContext(childWithExtraDimension).asInstanceOf[Aggregate]
+          val (reResolvedChildExprs, resolvedAliasDimensions) =
+            resolvedChild.aggregateExpressions.splitAt(aggregate.aggregateExpressions.length)
+          checkAnalysis(resolvedChild)
+
+          val originalChildExprs = aggregate.aggregateExpressions.map(trimNonTopLevelAliases)
+
+          val needsPushDown = ArrayBuffer.empty[NamedExpression]
+          val dimensionToAlias = unresolvedDim.zip(aliasedDimensions)
+          val evaluatedDimensions =
+            resolvedAliasDimensions.asInstanceOf[Seq[Alias]].zip(dimensionToAlias).map {
+              case (evaluated, (dimension, aliasDimension)) =>
+                val index = reResolvedChildExprs.indexWhere {
+                  case Alias(child, _) => child semanticEquals evaluated.child
+                  case other => other semanticEquals evaluated.child
+                }
+
+                if (index == -1) {
+                  if (hasCharVarchar(evaluated)) {
+                    needsPushDown += aliasDimension
+                    dimension.copy(child = aliasDimension)
+                  } else {
+                    needsPushDown += evaluated
+                    dimension.copy(child = evaluated.toAttribute)
+                  }
+                } else {
+                  dimension.copy(child = originalChildExprs(index).toAttribute)
+                }
+            }
+
+          val dimensionsMap = unresolvedDim.map(new TreeNodeRef(_)).zip(evaluatedDimensions).toMap
+          val finalDimensions = skylineItems.map { item =>
+            dimensionsMap.getOrElse(new TreeNodeRef(item), item)
+          }
+
+          if (skylineItems == finalDimensions) {
+            skyline
+          } else {
+            Project(aggregate.output,
+              SkylineOperator(distinct, complete, finalDimensions,
+                aggregate.copy(aggregateExpressions = originalChildExprs ++ needsPushDown)
+              )
+            )
+          }
+        } catch {
+          case ae: AnalysisException => skyline
         }
     }
 

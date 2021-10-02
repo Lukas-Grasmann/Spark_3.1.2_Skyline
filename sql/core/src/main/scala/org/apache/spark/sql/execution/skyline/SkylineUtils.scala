@@ -98,7 +98,7 @@ object SkylineUtils extends Logging {
       case SkylineIsComplete => false
       // determine whether to treat the dimensions as nullable by checking whether the dimension
       // is marked as nullable in Spark
-      case _ => skylineDimensions.map{f => f.child.nullable}.fold(false)((a, b) => a || b)
+      case _ => skylineDimensions.exists(_.child.nullable)
     }
 
     val localSkyline: SparkPlan = createSkyline(
