@@ -56,13 +56,12 @@ case object SkylineDiff extends SkylineMinMaxDiff {
  * @param child child expression (column/dimension)
  * @param minMaxDiff MIN/MAX/DIFF for the given dimension
  */
-case class SkylineItemOptions(
+case class SkylineDimension(
   child: Expression,
   minMaxDiff: SkylineMinMaxDiff
 ) extends Expression with Unevaluable {
   override def toString: String = s"$child ${minMaxDiff.sql}"
-  override def sql: String =
-    child.sql + " " + minMaxDiff.sql
+  override def sql: String = s"${child.sql} ${minMaxDiff.sql}"
 
   override def nullable: Boolean = child.nullable
 
@@ -80,9 +79,9 @@ case class SkylineItemOptions(
 }
 
 /**
- * Object factory helpers for [[SkylineItemOptions]]
+ * Object factory helpers for [[SkylineDimension]]
  */
-object SkylineItemOptions {
+object SkylineDimension {
   val MIN = "MIN"
   val MAX = "MAX"
   val DIFF = "DIFF"
@@ -94,13 +93,13 @@ object SkylineItemOptions {
    * @param child child expression/column (NOT to be confused with Column() of Spark SQL,
    *              to use a Spark SQL column use column.expression)
    * @param minMaxDiff string specification of "MIN"/"MAX"/"DIFF" (case-insensitive)
-   * @return a new object of [[SkylineItemOptions]]
+   * @return a new object of [[SkylineDimension]]
    */
-  def createSkylineItemOptions(
+  def createSkylineDimension(
     child: Expression,
     minMaxDiff: String
-  ): SkylineItemOptions = {
-    SkylineItemOptions(
+  ): SkylineDimension = {
+    SkylineDimension(
       child,
       minMaxDiff.toUpperCase(Locale.ROOT) match {
         case MIN => SkylineMin
@@ -117,13 +116,13 @@ object SkylineItemOptions {
    * @param child child expression/column (NOT to be confused with Column() of Spark SQL,
    *              to use a Spark SQL column use column.expression)
    * @param minMaxDiff skyline MIN/MAX/DIFF specification
-   * @return a new object of [[SkylineItemOptions]]
+   * @return a new object of [[SkylineDimension]]
    */
-  def createSkylineItemOptions(
+  def createSkylineDimension(
   child: Expression,
   minMaxDiff: SkylineMinMaxDiff
-  ): SkylineItemOptions = {
-    SkylineItemOptions(
+  ): SkylineDimension = {
+    SkylineDimension(
       child,
       minMaxDiff
     )

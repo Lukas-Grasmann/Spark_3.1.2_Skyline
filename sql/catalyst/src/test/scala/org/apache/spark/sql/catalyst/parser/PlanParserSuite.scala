@@ -339,6 +339,45 @@ class PlanParserSuite extends AnalysisTest {
 
   }
 
+  test("skyline") {
+    assertEqual(
+      "select * from t skyline of a min",
+      table("t").select(star()).skyline(table("t").smin('a))
+    )
+    assertEqual(
+      "select * from t skyline of a min, b max, c diff",
+      table("t").select(star()).skyline(
+        table("t").smin('a),
+        table("t").smax('b),
+        table("t").sdiff('c),
+      )
+    )
+    assertEqual(
+      "select * from t skyline of distinct a min, b max, c diff",
+      table("t").select(star()).skylineDistinct(
+        table("t").smin('a),
+        table("t").smax('b),
+        table("t").sdiff('c),
+      )
+    )
+    assertEqual(
+      "select * from t skyline of complete a min, b max, c diff",
+      table("t").select(star()).skylineComplete(
+        table("t").smin('a),
+        table("t").smax('b),
+        table("t").sdiff('c),
+      )
+    )
+    assertEqual(
+      "select * from t skyline of distinct complete a min, b max, c diff",
+      table("t").select(star()).skylineDistinctComplete(
+        table("t").smin('a),
+        table("t").smax('b),
+        table("t").sdiff('c),
+      )
+    )
+  }
+
   test("limit") {
     val sql = "select * from t"
     val plan = table("t").select(star())

@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineItemOptions, SkylineMax, SkylineMin}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineDimension, SkylineMax, SkylineMin}
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.{toPrettySQL, CharVarcharUtils}
 import org.apache.spark.sql.execution.aggregate.TypedAggregateExpression
@@ -1310,7 +1310,7 @@ class Column(val expr: Expression) extends Logging {
    * @since skyline v0.0.1
    */
   def smin: Column = withExpr {
-    SkylineItemOptions.createSkylineItemOptions(expr, SkylineMin)
+    SkylineDimension.createSkylineDimension(expr, SkylineMin)
   }
 
   /**
@@ -1325,7 +1325,7 @@ class Column(val expr: Expression) extends Logging {
    * @since skyline v0.0.1
    */
   def smax: Column = withExpr {
-    SkylineItemOptions.createSkylineItemOptions(expr, SkylineMax)
+    SkylineDimension.createSkylineDimension(expr, SkylineMax)
   }
 
   /**
@@ -1340,7 +1340,7 @@ class Column(val expr: Expression) extends Logging {
    * @since skyline v0.0.1
    */
   def sdiff: Column = withExpr {
-    SkylineItemOptions.createSkylineItemOptions(expr, SkylineDiff)
+    SkylineDimension.createSkylineDimension(expr, SkylineDiff)
   }
 
   /**

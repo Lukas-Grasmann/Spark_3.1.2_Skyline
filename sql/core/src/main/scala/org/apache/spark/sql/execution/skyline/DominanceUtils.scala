@@ -110,7 +110,8 @@ object DominanceUtils extends Logging {
     schema: Seq[AbstractDataType],
     ordinals: Seq[Int],
     minMaxDiff: Seq[SkylineMinMaxDiff],
-    skipNullValues: Boolean
+    skipNullValues: Boolean,
+    skipMismatchingNulls: Boolean = false
   ): DominanceResult = {
     // require that all input lists have the same length
     require(ordinals.length == minMaxDiff.length)
@@ -120,6 +121,12 @@ object DominanceUtils extends Logging {
     var a_strictly_better = false;  // a strictly better than b for at least one dimension
     var b_strictly_better = false;  // b strictly better than a for at least one dimension
     var a_different_b = false;      // a different to b for at least one DIFF dimension
+
+    if (skipMismatchingNulls) {
+      if (ordinals.exists ( ord => rowA.isNullAt(ord) != rowB.isNullAt(ord) ) ) {
+        return Incomparability
+      }
+    }
 
     // for each skyline dimension (for each ordinal)
     ordinals.zipWithIndex.foreach { f =>

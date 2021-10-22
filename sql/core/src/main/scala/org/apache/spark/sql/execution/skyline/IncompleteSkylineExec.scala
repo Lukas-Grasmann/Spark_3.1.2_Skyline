@@ -23,7 +23,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineItemOptions}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDimension, SkylineDistinct}
 import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, Distribution}
 import org.apache.spark.sql.execution.{AliasAwareOutputPartitioning, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -43,13 +43,13 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
  *
  * @param skylineDistinct whether or not the results should be distinct
  *                        with regards to the skyline dimensions
- * @param skylineDimensions list of skyline dimensions as [[SkylineItemOptions]]
+ * @param skylineDimensions list of skyline dimensions as [[SkylineDimension]]
  * @param child child node in plan which produces the input for the skyline operator
  */
 case class IncompleteSkylineExec(
- skylineDistinct: SkylineDistinct,
- skylineDimensions: Seq[SkylineItemOptions],
- child: SparkPlan
+  skylineDistinct: SkylineDistinct,
+  skylineDimensions: Seq[SkylineDimension],
+  child: SparkPlan
 ) extends BaseSkylineExec with AliasAwareOutputPartitioning with Logging {
 
   override lazy val metrics = Map(
@@ -106,8 +106,9 @@ case class IncompleteSkylineExec(
           // check domination result and chose action accordingly
           dominationResult match {
             case Domination =>
+              // TODO re-check algorithm
               // if the current row dominates another row the row is removed
-              datasetWindow.remove(windowRow)
+              // datasetWindow -= windowRow
             case AntiDomination =>
               // if the row is itself dominated we do not add it by setting isDominated
               isDominated = true
@@ -123,8 +124,7 @@ case class IncompleteSkylineExec(
         if (!isDominated) {
           resultWindow += row
         }
-        // drop first (= current) element from dataset to prevent multiple checks
-        datasetWindow.drop(1)
+        // datasetWindow -= row
       }
 
       // the number of rows after the final iteration is equal to the number of output tuples

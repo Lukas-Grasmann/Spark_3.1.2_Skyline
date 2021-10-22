@@ -23,7 +23,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Expression, NamedExpression}
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineItemOptions}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDimension, SkylineDistinct}
 import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, ClusteredDistribution, Distribution, UnspecifiedDistribution}
 import org.apache.spark.sql.execution.{AliasAwareOutputPartitioning, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -45,15 +45,15 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
  *
  * @param skylineDistinct whether or not the results should be distinct
  *                        with regards to the skyline dimensions
- * @param skylineDimensions list of skyline dimensions as [[SkylineItemOptions]]
+ * @param skylineDimensions list of skyline dimensions as [[SkylineDimension]]
  * @param requiredChildDistributionExpressions expressions for the distribution (see above)
  * @param child child node in plan which produces the input for the skyline operator
  */
 case class BlockNestedLoopSkylineExec(
   skylineDistinct: SkylineDistinct,
-  skylineDimensions: Seq[SkylineItemOptions],
+  skylineDimensions: Seq[SkylineDimension],
   requiredChildDistributionExpressions: Option[Seq[Expression]],
-  skipNullValuesInDominance: Boolean,
+  isIncompleteSkyline: Boolean,
   child: SparkPlan
 ) extends BaseSkylineExec with AliasAwareOutputPartitioning with Logging {
 
@@ -114,7 +114,8 @@ case class BlockNestedLoopSkylineExec(
             childOutputSchema,
             skylineDimensionOrdinals,
             skylineDimensions.map { f => f.minMaxDiff },
-            skipNullValues = skipNullValuesInDominance
+            skipNullValues = isIncompleteSkyline,
+            skipMismatchingNulls = isIncompleteSkyline
           )
 
           // check domination result and chose action accordingly

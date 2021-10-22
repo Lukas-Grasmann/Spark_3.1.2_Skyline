@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.skyline
 
 import org.apache.spark.sql.catalyst.expressions.{Attribute, NamedExpression}
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDistinct, SkylineIsDistinct, SkylineItemOptions}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDimension, SkylineDistinct, SkylineIsDistinct}
 import org.apache.spark.sql.execution.{AliasAwareOutputPartitioning, ExplainUtils, UnaryExecNode}
 
 /**
@@ -35,8 +35,8 @@ trait BaseSkylineExec extends UnaryExecNode with AliasAwareOutputPartitioning {
   def skylineDistinctBoolean: Boolean =
     skylineDistinct == SkylineIsDistinct
 
-  // Sequence of SkylineItemOptions that hold the dimensions
-  def skylineDimensions: Seq[SkylineItemOptions]
+  // Sequence of [[SkylineDimension]] that hold the dimensions
+  def skylineDimensions: Seq[SkylineDimension]
   // Get the named expressions of the skyline dimensions
   def skylineDimensionExpressions: Seq[NamedExpression] =
     skylineDimensions.map(_.child.asInstanceOf[NamedExpression])

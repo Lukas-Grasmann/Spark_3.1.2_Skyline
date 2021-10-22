@@ -77,7 +77,7 @@ case object SkylineUnspecifiedCompleteness extends SkylineComplete {
 case class SkylineOperator(
   distinct: SkylineDistinct,
   complete: SkylineComplete,
-  skylineItems: Seq[SkylineItemOptions],
+  skylineItems: Seq[SkylineDimension],
   child: LogicalPlan) extends UnaryNode {
 
   override def output: Seq[Attribute] = child.output
@@ -97,14 +97,14 @@ object SkylineOperator {
    *
    * @param distinct Boolean whether or not the items in the skyline are distinct.
    * @param complete Boolean whether or not the input is complete (no null values)
-   * @param skylineItems Sequence of [[SkylineItemOptions]]
+   * @param skylineItems Sequence of [[SkylineDimension]]
    * @param child child logical plan node ([[LogicalPlan]])
    * @return a new object of [[SkylineOperator]]
    */
   def createSkylineOperator(
     distinct: Boolean,
     complete: Boolean,
-    skylineItems: Seq[SkylineItemOptions],
+    skylineItems: Seq[SkylineDimension],
     child: LogicalPlan
   ): SkylineOperator = {
     SkylineOperator(
@@ -130,14 +130,14 @@ object SkylineOperator {
    *
    * @param distinct Whether or not the items in the skyline are distinct.
    * @param complete Whether or not the input is complete (no null values)
-   * @param skylineItems Sequence of [[SkylineItemOptions]]
+   * @param skylineItems Sequence of [[SkylineDimension]]
    * @param child child logical plan node ([[LogicalPlan]])
    * @return a new object of [[SkylineOperator]]
    */
   def createSkylineOperator(
     distinct: SkylineDistinct,
     complete: SkylineComplete,
-    skylineItems: Seq[SkylineItemOptions],
+    skylineItems: Seq[SkylineDimension],
     child: LogicalPlan
   ): SkylineOperator = {
     SkylineOperator(

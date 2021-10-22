@@ -1990,7 +1990,7 @@ class Dataset[T] private[sql](
       distinct,
       complete,
       (expr +: exprs).map(
-        f => SkylineItemOptions.createSkylineItemOptions(Column(f._1).expr, f._2)
+        f => SkylineDimension.createSkylineDimension(Column(f._1).expr, f._2)
       ),
       logicalPlan
     )
@@ -2015,11 +2015,11 @@ class Dataset[T] private[sql](
       complete = false,
       (exprs).map(
         _.expr match {
-          case s @ SkylineItemOptions(_, _) => s
+          case s @ SkylineDimension(_, _) => s
           case _ =>
             throw new IllegalArgumentException(
               s"""
-                 | Illegal item found in expression. Must be SkylineItemOptions.
+                 | Illegal item found in expression. Must be SkylineDimension.
                 """.stripMargin
             )
         }
@@ -2047,11 +2047,11 @@ class Dataset[T] private[sql](
       complete = false,
       (exprs).map(
         _.expr match {
-          case s @ SkylineItemOptions(_, _) => s
+          case s @ SkylineDimension(_, _) => s
           case _ =>
             throw new IllegalArgumentException(
               s"""
-                 | Illegal item found in expression. Must be SkylineItemOptions.
+                 | Illegal item found in expression. Must be SkylineDimension.
                 """.stripMargin
             )
         }
@@ -2080,11 +2080,11 @@ class Dataset[T] private[sql](
       complete = true,
       (exprs).map(
         _.expr match {
-          case s @ SkylineItemOptions(_, _) => s
+          case s @ SkylineDimension(_, _) => s
           case _ =>
             throw new IllegalArgumentException(
               s"""
-                 | Illegal item found in expression. Must be SkylineItemOptions.
+                 | Illegal item found in expression. Must be SkylineDimension.
                 """.stripMargin
             )
         }
@@ -2113,11 +2113,11 @@ class Dataset[T] private[sql](
       complete = true,
       (exprs).map(
         _.expr match {
-          case s @ SkylineItemOptions(_, _) => s
+          case s @ SkylineDimension(_, _) => s
           case _ =>
             throw new IllegalArgumentException(
               s"""
-                 | Illegal item found in expression. Must be SkylineItemOptions.
+                 | Illegal item found in expression. Must be SkylineDimension.
                 """.stripMargin
             )
         }
@@ -2143,7 +2143,7 @@ class Dataset[T] private[sql](
    * @since skyline v0.0.1
    */
   def smin(expr: String): Column =
-    Column( SkylineItemOptions.createSkylineItemOptions( Column(expr).expr, SkylineMin ) )
+    Column( SkylineDimension.createSkylineDimension( Column(expr).expr, SkylineMin ) )
 
   /**
    * Skyline shorthand for maximizing a dimension
@@ -2161,7 +2161,7 @@ class Dataset[T] private[sql](
    * @since skyline v0.0.1
    */
   def smax(expr: String): Column =
-    Column( SkylineItemOptions.createSkylineItemOptions( Column(expr).expr, SkylineMax ) )
+    Column( SkylineDimension.createSkylineDimension( Column(expr).expr, SkylineMax ) )
 
   /**
    * Skyline shorthand for difference of a dimension
@@ -2179,7 +2179,7 @@ class Dataset[T] private[sql](
    * @since skyline v0.0.1
    */
   def sdiff(expr: String): Column =
-    Column( SkylineItemOptions.createSkylineItemOptions( Column(expr).expr, SkylineDiff ) )
+    Column( SkylineDimension.createSkylineDimension( Column(expr).expr, SkylineDiff ) )
 
 
  /**

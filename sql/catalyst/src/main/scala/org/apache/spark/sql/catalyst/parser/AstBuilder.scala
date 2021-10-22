@@ -920,7 +920,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
       } else {
         SkylineUnspecifiedCompleteness
       },
-      // map skyline items to [[SkylineItemOptions]] that can be used in logical plan
+      // map skyline items to [[SkylineDimension]] that can be used in logical plan
       skylineItems.map(visitSkylineItems),
       // set (single) child
       query
@@ -928,12 +928,12 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
   }
 
   /**
-   * Create a [[SkylineItemOptions]] for a single dimension from the [[SkylineItemOptions]]
+   * Create a [[SkylineDimension]] for a single dimension from the [[SkylineDimension]]
    * provided by the ANTLR parser.
    *
    * Contains distinctiveness, epxression (column), and MIN/MAX/DIFF of a single skyline dimension.
    */
-  private def visitSkylineItems(ctx: SkylineItemContext): SkylineItemOptions = withOrigin(ctx) {
+  private def visitSkylineItems(ctx: SkylineItemContext): SkylineDimension = withOrigin(ctx) {
     val minMaxDiff = if (ctx.MIN != null) {
       // skyline dimension minimization
       SkylineMin
@@ -951,7 +951,7 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
     }
 
     // return skyline item options
-    SkylineItemOptions(
+    SkylineDimension(
       child = expression(ctx.expression),
       minMaxDiff = minMaxDiff
     )

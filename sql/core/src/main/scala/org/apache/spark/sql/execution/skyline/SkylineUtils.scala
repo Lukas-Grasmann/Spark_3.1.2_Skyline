@@ -18,8 +18,8 @@
 package org.apache.spark.sql.execution.skyline
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.{Expression, IsNotNull}
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineComplete, SkylineDistinct, SkylineIsComplete, SkylineItemOptions}
+import org.apache.spark.sql.catalyst.expressions.{Expression, IsNull}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineComplete, SkylineDimension, SkylineDistinct, SkylineIsComplete}
 import org.apache.spark.sql.execution.SparkPlan
 
 /**
@@ -37,7 +37,7 @@ object SkylineUtils extends Logging {
    */
   private def createSkyline(
      skylineDistinct: SkylineDistinct,
-     skylineDimensions: Seq[SkylineItemOptions],
+     skylineDimensions: Seq[SkylineDimension],
      requiredChildDistributionExpressions: Option[Seq[Expression]],
      globalSkyline: Boolean,
      incompleteSkyline: Boolean,
@@ -54,8 +54,8 @@ object SkylineUtils extends Logging {
      BlockNestedLoopSkylineExec(
        skylineDistinct,
        skylineDimensions,
-       Some(skylineDimensions.map { f => IsNotNull(f.child) }),
-       skipNullValuesInDominance = true,
+       Some(skylineDimensions.map { f => IsNull(f.child) }),
+       isIncompleteSkyline = true,
        child
      )
    } else if (globalSkyline) {
@@ -63,7 +63,7 @@ object SkylineUtils extends Logging {
         skylineDistinct,
         skylineDimensions,
         Some(Nil),
-        skipNullValuesInDominance = false,
+        isIncompleteSkyline = false,
         child
       )
     } else {
@@ -71,7 +71,7 @@ object SkylineUtils extends Logging {
        skylineDistinct,
        skylineDimensions,
        requiredChildDistributionExpressions,
-       skipNullValuesInDominance = false,
+       isIncompleteSkyline = false,
        child
      )
    }
@@ -88,7 +88,7 @@ object SkylineUtils extends Logging {
   def planSkyline(
      skylineDistinct: SkylineDistinct,
      skylineComplete: SkylineComplete,
-     skylineDimensions: Seq[SkylineItemOptions],
+     skylineDimensions: Seq[SkylineDimension],
      child: SparkPlan
    ) : Seq[SparkPlan] = {
 

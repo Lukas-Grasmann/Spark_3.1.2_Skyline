@@ -48,7 +48,7 @@ SELECT [ hints , ... ] [ ALL | DISTINCT ] { [ [ named_expression | regex_column_
     [ WHERE boolean_expression ]
     [ GROUP BY expression [ , ... ] ]
     [ HAVING boolean_expression ]
-    [ [ COMPLETE ] SKYLINE OF [ DISTINCT ] { expression { MIN | MAX | DIFF } [ , ... ] } ]
+    [ SKYLINE OF [ DISTINCT ] [ COMPLETE ] { expression { MIN | MAX | DIFF } [ , ... ] } ]
 ```
 
 ### Parameters

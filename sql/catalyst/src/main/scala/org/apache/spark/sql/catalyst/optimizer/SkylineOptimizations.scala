@@ -45,7 +45,7 @@ object RemoveEmptySkylines extends Rule[LogicalPlan] {
 
 /**
  * Optimizer rule for removing redundant dimension specifications from the skyline.
- * Uses Scala built-in .distinct() function on the SkylineItemOptions.
+ * Uses Scala built-in .distinct() function on the [[SkylineDimension]].
  */
 object RemoveRedundantSkylineDimensions extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transform removeRedundantDimensions
@@ -96,11 +96,11 @@ object RemoveSingleDimensionalSkylines extends Rule[LogicalPlan] {
             // get maximum in case of maximized skyline
             case SkylineMax => Alias(
               Max(skylineDimension.child).toAggregateExpression(),
-              "max(" + skylineDimension.child.sql + ")")() :: Nil
+              "max")() :: Nil
             // get minimum in all other cases (only minimized skyline remains)
             case _ => Alias(
               Min(skylineDimension.child).toAggregateExpression(),
-              "min(" + skylineDimension.child.sql + ")")() :: Nil
+              "min")() :: Nil
           },
           projection  // use projection to skyline dimension as input for aggregate
         )

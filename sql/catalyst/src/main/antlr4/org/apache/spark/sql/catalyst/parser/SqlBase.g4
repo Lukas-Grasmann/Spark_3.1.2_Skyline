@@ -943,9 +943,9 @@ frameBound
     ;
 
 skylineClause
-    : skylineComplete=COMPLETE?
-      SKYLINE
+    : SKYLINE
       skylineDistinct=DISTINCT?
+      skylineComplete=COMPLETE?
       skylineItems+=skylineItem (',' skylineItems+=skylineItem)*
     ;
 

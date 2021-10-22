@@ -743,8 +743,8 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         throw new UnsupportedOperationException(s"MERGE INTO TABLE is not supported temporarily.")
       case logical.CollectMetrics(name, metrics, child) =>
         execution.CollectMetricsExec(name, metrics, planLater(child)) :: Nil
-      case SkylineOperator(distinct, complete, skylineItemOptions, child) =>
-        SkylineUtils.planSkyline( distinct, complete, skylineItemOptions, planLater(child) )
+      case SkylineOperator(distinct, complete, skylineDimensions, child) =>
+        SkylineUtils.planSkyline( distinct, complete, skylineDimensions, planLater(child) )
       case _ => Nil
     }
   }

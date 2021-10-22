@@ -141,6 +141,10 @@ package object dsl {
     def desc_nullsFirst: SortOrder = SortOrder(expr, Descending, NullsFirst, Seq.empty)
     def as(alias: String): NamedExpression = Alias(expr, alias)()
     def as(alias: Symbol): NamedExpression = Alias(expr, alias.name)()
+
+    def smin: SkylineDimension = SkylineDimension(expr, SkylineMin)
+    def smax: SkylineDimension = SkylineDimension(expr, SkylineMax)
+    def sdiff: SkylineDimension = SkylineDimension(expr, SkylineDiff)
   }
 
   trait ExpressionConversions {
@@ -396,34 +400,34 @@ package object dsl {
         Aggregate(groupingExprs, aliasedExprs, logicalPlan)
       }
 
-      def skyline(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+      def skyline(skylineDimensions: SkylineDimension*): LogicalPlan =
         SkylineOperator(
-          SkylineIsNotDistinct, SkylineUnspecifiedCompleteness, skylineItemOptions, logicalPlan
+          SkylineIsNotDistinct, SkylineUnspecifiedCompleteness, skylineDimensions, logicalPlan
         )
 
-      def skylineDistinct(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+      def skylineDistinct(skylineDimensions: SkylineDimension*): LogicalPlan =
         SkylineOperator(
-          SkylineIsDistinct, SkylineUnspecifiedCompleteness, skylineItemOptions, logicalPlan
+          SkylineIsDistinct, SkylineUnspecifiedCompleteness, skylineDimensions, logicalPlan
         )
 
-      def skylineComplete(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+      def skylineComplete(skylineDimensions: SkylineDimension*): LogicalPlan =
         SkylineOperator(
-          SkylineIsNotDistinct, SkylineIsComplete, skylineItemOptions, logicalPlan
+          SkylineIsNotDistinct, SkylineIsComplete, skylineDimensions, logicalPlan
         )
 
-      def skylineDistinctComplete(skylineItemOptions: SkylineItemOptions*): LogicalPlan =
+      def skylineDistinctComplete(skylineDimensions: SkylineDimension*): LogicalPlan =
         SkylineOperator(
-          SkylineIsDistinct, SkylineIsComplete, skylineItemOptions, logicalPlan
+          SkylineIsDistinct, SkylineIsComplete, skylineDimensions, logicalPlan
         )
 
-      def smin(expr: Expression): SkylineItemOptions =
-        SkylineItemOptions(expr, SkylineMin)
+      def smin(expr: Expression): SkylineDimension =
+        SkylineDimension(expr, SkylineMin)
 
-      def smax(expr: Expression): SkylineItemOptions =
-        SkylineItemOptions(expr, SkylineMax)
+      def smax(expr: Expression): SkylineDimension =
+        SkylineDimension(expr, SkylineMax)
 
-      def sdiff(expr: Expression): SkylineItemOptions =
-        SkylineItemOptions(expr, SkylineDiff)
+      def sdiff(expr: Expression): SkylineDimension =
+        SkylineDimension(expr, SkylineDiff)
 
       def having(
           groupingExprs: Expression*)(

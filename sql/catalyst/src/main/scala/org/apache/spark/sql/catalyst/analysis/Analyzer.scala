@@ -34,7 +34,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.SubExprUtils._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.objects._
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineItemOptions, SkylineOperator}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDimension, SkylineOperator}
 import org.apache.spark.sql.catalyst.optimizer.OptimizeUpdateFields
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -2072,7 +2072,7 @@ class Analyzer(override val catalogManager: CatalogManager)
       case s @ SkylineOperator(_, _, skylineItems, child)
           if (!s.resolved || s.missingInput.nonEmpty) && child.resolved =>
         val (exprs, newChild) = resolveExprsAndAddMissingAttrs(skylineItems, child)
-        val dimensions = exprs.map(_.asInstanceOf[SkylineItemOptions])
+        val dimensions = exprs.map(_.asInstanceOf[SkylineDimension])
         if (child.output == newChild.output) {
           s.copy(skylineItems = dimensions)
         } else {

@@ -29,7 +29,7 @@ clause.
 ### Syntax
 
 ```sql
-[ COMPLETE ] SKYLINE OF [ DISTINCT ] { expression { MIN | MAX | DIFF } [ , ... ] }
+SKYLINE OF [ DISTINCT ] [ COMPLETE ] { expression { MIN | MAX | DIFF } [ , ... ] }
 ```
 
 ### Parameters
@@ -44,6 +44,10 @@ clause.
 
   Specifies an expression that represents a skyline dimension. Typically is a column but may also be an alias or similar.
 
+* **DISTINCT**
+
+  Specifies that a given skyline should be distinct i.e. data points which are the same for every dimension are eliminated.
+
 * **COMPLETE**
 
   Specified that a given skyline does not contain missing values i.e. no null values.
@@ -51,10 +55,6 @@ clause.
   ***WILL PRODUCE UNEXPECTED RESULTS IF NULL VALUES ARE ENCOUNTERED***
   The appropriate complete or incomplete algorithm will be chosen automatically if option is not specified based on nullability.
   Performance of incomplete algorithms may be inferior to complete algorithms on complete inputs but the output is correct regardless.
-
-* **DISTINCT**
-
-  Specifies that a given skyline should be distinct i.e. data points which are the same for every dimension are eliminated.
 
 * **MIN**
 
