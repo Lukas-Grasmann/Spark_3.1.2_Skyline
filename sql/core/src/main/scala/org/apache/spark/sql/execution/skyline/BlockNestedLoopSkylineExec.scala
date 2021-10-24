@@ -47,6 +47,7 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
  *                        with regards to the skyline dimensions
  * @param skylineDimensions list of skyline dimensions as [[SkylineDimension]]
  * @param requiredChildDistributionExpressions expressions for the distribution (see above)
+ * @param isIncompleteSkyline specifies whether the skyline is incomplete
  * @param child child node in plan which produces the input for the skyline operator
  */
 case class BlockNestedLoopSkylineExec(
