@@ -17,10 +17,11 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, EqualTo, IsNotNull, Literal, NamedExpression, ScalarSubquery}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Max, Min}
 import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineIsDistinct, SkylineMax, SkylineMin, SkylineOperator}
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Deduplicate, Filter, GlobalLimit, LocalLimit, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Deduplicate, Filter, GlobalLimit, Join, LocalLimit, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 
 /**
@@ -131,5 +132,54 @@ object RemoveSingleDimensionalSkylines extends Rule[LogicalPlan] {
         // since the values should be distinct, we eliminate duplicates using Deduplicate
         // ATTENTION: Deduplicate must be transformed to aggregate by optimizations
         Deduplicate(skylineItems.head.child.references.toSeq, child)
+  }
+}
+
+/**
+ * Optimizer rule for pushing a skyline operator through a join if it can be fully computed before
+ * the join.
+ *
+ * This rule decreases the input size of both the join and the skyline operator potentially
+ * yielding significant performance increases if large amounts of data are removed in the skyline
+ * step thus making the join step significantly cheaper.
+ *
+ * We first check whether the skyline dimensions only regard attributes on either the left or the
+ * right side of the join. If this is the case, we reconstruct the join such that the skyline is
+ * now a child of the join (either left or right side depending on which the dimensions occur).
+ * We also take care that the PROJECT which exists between skyline and join is regarded properly
+ * and reintroduced after pushing the skyline through.
+ */
+object PushSkylineThroughJoin extends Rule[LogicalPlan] with Logging {
+  override def apply(plan: LogicalPlan): LogicalPlan =
+    plan transform pushSkylineThroughJoin
+
+  private val pushSkylineThroughJoin: PartialFunction[LogicalPlan, LogicalPlan] = {
+    // match skylines which are computed on joins
+    case s @ SkylineOperator(_, _, dimensions,
+      p @ Project(_,
+        j @ Join(left, right, _, _, _) ) ) =>
+          // check if all skyline dimensions can be found on the left side
+          // but NOT on the right side
+          if (
+            dimensions.map(_.child.references.head).map(_.exprId).forall(
+              left.output.map(_.exprId).contains )
+            && ! dimensions.map(_.child.references.head).map(_.exprId).exists(
+              right.output.map(_.exprId).contains )
+          ) {
+            p.copy(child = j.copy(left = s.copy(child = left)))
+          }
+          // check if all skyline dimensions can be found on the right side
+          // but NOT on the left side
+          else if (
+            dimensions.map(_.child.references.head).map(_.exprId).forall(
+              right.output.map(_.exprId).contains )
+            && ! dimensions.map(_.child.references.head).map(_.exprId).exists(
+              left.output.map(_.exprId).contains )
+          ) {
+            p.copy(child = j.copy(right = s.copy(child = right)))
+          }
+          // return the skyline as-is if the skyline does not involve only a single side of
+          // the join but instead regards both sides
+          else { s }
   }
 }

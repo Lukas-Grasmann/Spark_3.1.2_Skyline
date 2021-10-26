@@ -180,7 +180,8 @@ abstract class Optimizer(catalogManager: CatalogManager)
       RemoveRedundantSkylineDimensions,
       RemoveSingleDimensionalSkylines,
       // added since the skyline optimization may produce Deduplicates
-      ReplaceDeduplicateWithAggregate) ::
+      ReplaceDeduplicateWithAggregate,
+      PushSkylineThroughJoin) ::
     Batch("Replace Operators", fixedPoint,
       RewriteExceptAll,
       RewriteIntersectAll,
