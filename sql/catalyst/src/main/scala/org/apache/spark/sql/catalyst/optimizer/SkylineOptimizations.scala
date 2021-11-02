@@ -20,7 +20,7 @@ package org.apache.spark.sql.catalyst.optimizer
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, EqualTo, IsNotNull, Literal, NamedExpression, ScalarSubquery}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Max, Min}
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineIsDistinct, SkylineMax, SkylineMin, SkylineOperator}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineIsDistinct, SkylineIsNotDistinct, SkylineMax, SkylineMin, SkylineOperator}
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Deduplicate, Filter, GlobalLimit, Join, LocalLimit, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 
@@ -155,7 +155,7 @@ object PushSkylineThroughJoin extends Rule[LogicalPlan] with Logging {
 
   private val pushSkylineThroughJoin: PartialFunction[LogicalPlan, LogicalPlan] = {
     // match skylines which are computed on joins
-    case s @ SkylineOperator(_, _, dimensions,
+    case s @ SkylineOperator(SkylineIsNotDistinct, _, dimensions,
       p @ Project(_,
         j @ Join(left, right, _, _, _) ) ) =>
           // check if all skyline dimensions can be found on the left side
