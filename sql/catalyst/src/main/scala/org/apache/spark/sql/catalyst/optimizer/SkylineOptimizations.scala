@@ -132,6 +132,15 @@ object RemoveSingleDimensionalSkylines extends Rule[LogicalPlan] {
         // since the values should be distinct, we eliminate duplicates using Deduplicate
         // ATTENTION: Deduplicate must be transformed to aggregate by optimizations
         Deduplicate(skylineItems.head.child.references.toSeq, child)
+    // in case of a skyline operator with a single dimension AND
+    // the dimension is of the DIFF skyline type AND
+    // the skyline is NOT distinct
+    case SkylineOperator(_@SkylineIsNotDistinct, _, skylineItems, child)
+      if skylineItems.size == 1 && skylineItems.head.minMaxDiff == SkylineDiff =>
+      // since with only a single diff skyline dimension there can never be
+      // a dominance relationship, there is no scenario in which tuples are removed
+      // the skyline is therefore removed in its entirety
+      child
   }
 }
 

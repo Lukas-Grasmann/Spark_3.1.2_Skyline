@@ -20,8 +20,8 @@ package org.apache.spark.sql.catalyst.optimizer
 import org.apache.spark.sql.catalyst.analysis.{AnalysisTest, Analyzer}
 import org.apache.spark.sql.catalyst.dsl.expressions._
 import org.apache.spark.sql.catalyst.dsl.plans._
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AggregateFunction, Max, Min}
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, EqualTo, IsNotNull, Literal, ScalarSubquery}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AggregateFunction, Max, Min}
 import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineDiff, SkylineDimension, SkylineMax, SkylineMin}
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, Deduplicate, Filter, GlobalLimit, LocalLimit, LocalRelation, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.RuleExecutor
@@ -39,7 +39,7 @@ class SkylineSingleDimensionSuite extends AnalysisTest {
 
   test("transform single dimensional non-distinct MIN skyline") {
     val query = testRelation.skyline(
-      SkylineDimension('a.expr, SkylineMin)
+      SkylineDimension('a, SkylineMin)
     )
     val optimized = Optimize.execute(query.analyze)
 
@@ -58,7 +58,7 @@ class SkylineSingleDimensionSuite extends AnalysisTest {
 
   test("transform single dimensional distinct MIN skyline") {
     val query = testRelation.skylineDistinct(
-      SkylineDimension('a.expr, SkylineMin)
+      SkylineDimension('a, SkylineMin)
     )
     val optimized = Optimize.execute(query.analyze)
 
@@ -77,7 +77,7 @@ class SkylineSingleDimensionSuite extends AnalysisTest {
 
   test("transform single dimensional non-distinct MAX skyline") {
     val query = testRelation.skyline(
-      SkylineDimension('a.expr, SkylineMax)
+      SkylineDimension('a, SkylineMax)
     )
     val optimized = Optimize.execute(query.analyze)
 
@@ -96,7 +96,7 @@ class SkylineSingleDimensionSuite extends AnalysisTest {
 
   test("transform single dimensional distinct MAX skyline") {
     val query = testRelation.skylineDistinct(
-      SkylineDimension('a.expr, SkylineMax)
+      SkylineDimension('a, SkylineMax)
     )
     val optimized = Optimize.execute(query.analyze)
 
@@ -113,21 +113,19 @@ class SkylineSingleDimensionSuite extends AnalysisTest {
     checkSingleDimensionalMinMaxTransformation(optimized, min = false, distinct = true)
   }
 
-  test("do NOT transform single dimensional non-distinct DIFF skyline") {
+  test("remove single dimensional non-distinct DIFF skyline") {
     val query = testRelation.skyline(
-      SkylineDimension('a.expr, SkylineDiff)
+      SkylineDimension('a, SkylineDiff)
     )
     val optimized = Optimize.execute(query.analyze)
-    val correctAnswer = testRelation.skyline(
-      SkylineDimension('a.expr, SkylineDiff)
-    ).analyze
+    val correctAnswer = testRelation.analyze
 
     comparePlans(optimized, correctAnswer)
   }
 
   test("transform single dimensional distinct DIFF skyline") {
     val query = testRelation.skylineDistinct(
-      SkylineDimension('a.expr, SkylineDiff)
+      SkylineDimension('a, SkylineDiff)
     )
     val optimized = Optimize.execute(query.analyze)
     val correctAnswer = Deduplicate(
