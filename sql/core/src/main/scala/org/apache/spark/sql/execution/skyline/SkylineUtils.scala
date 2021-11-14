@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.skyline
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.{Expression, IsNull}
-import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineComplete, SkylineDimension, SkylineDistinct, SkylineIsComplete}
+import org.apache.spark.sql.catalyst.expressions.skyline.{SkylineComplete, SkylineDimension, SkylineDistinct, SkylineForceBNL, SkylineIsComplete}
 import org.apache.spark.sql.execution.SparkPlan
 
 /**
@@ -91,6 +91,16 @@ object SkylineUtils extends Logging {
      skylineDimensions: Seq[SkylineDimension],
      child: SparkPlan
    ) : Seq[SparkPlan] = {
+
+    if (skylineComplete == SkylineForceBNL) {
+      BlockNestedLoopSkylineExec(
+        skylineDistinct,
+        skylineDimensions,
+        Some(Nil),
+        isIncompleteSkyline = false,
+        child
+      )
+    }
 
     // check whether at least one dimension is nullable
     val dimensionNullable = skylineComplete match {

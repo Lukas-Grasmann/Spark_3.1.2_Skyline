@@ -1960,6 +1960,57 @@ class Dataset[T] private[sql](
   def skylineDistinctComplete(expr: (String, String), exprs: (String, String)*): DataFrame =
     skylineInternal(distinct = true, complete = true, expr, exprs: _*)
 
+  /**
+   * Block-nested-loop skyline for multiple (but at least one) skyline dimensions.
+   * Forces Spark to use the (complete) block-nested-loop algorithm.
+   * Skyline IS NOT distinct
+   * {{{
+   *   // df.skylineBNL((...), (...), ...) where each bracket corresponds to a dimension
+   *   df.skylineBNL(("price", "min"), ("distance", "min"))
+   * }}}
+   *
+   * ONLY FOR DEBUGGING, TESTING, AND BENCHMARKING
+   *
+   * @group skyline
+   * @since skyline v0.0.1
+   */
+  @scala.annotation.varargs
+  def skylineBNL(expr: (String, String), exprs: (String, String)*): DataFrame = withPlan {
+    SkylineOperator(
+      SkylineIsNotDistinct,
+      SkylineForceBNL,
+      (expr +: exprs).map(
+        f => SkylineDimension.createSkylineDimension(Column(f._1).expr, f._2)
+      ),
+      logicalPlan
+    )
+  }
+
+  /**
+   * Block-nested-loop skyline for multiple (but at least one) skyline dimensions.
+   * Forces Spark to use the (complete) block-nested-loop algorithm.
+   * Skyline IS distinct
+   * {{{
+   *   // df.skylineDistinctBNL((...), (...), ...) where each bracket corresponds to a dimension
+   *   df.skylineDistinctBNL(("price", "min"), ("distance", "min"))
+   * }}}
+   *
+   * ONLY FOR DEBUGGING, TESTING, AND BENCHMARKING
+   *
+   * @group skyline
+   * @since skyline v0.0.1
+   */
+  @scala.annotation.varargs
+  def skylineDistinctBNL(expr: (String, String), exprs: (String, String)*): DataFrame = withPlan {
+    SkylineOperator(
+      SkylineIsDistinct,
+      SkylineForceBNL,
+      (expr +: exprs).map(
+        f => SkylineDimension.createSkylineDimension(Column(f._1).expr, f._2)
+      ),
+      logicalPlan
+    )
+  }
 
   /**
    * Internal skyline function for handling skylines with string specifications.

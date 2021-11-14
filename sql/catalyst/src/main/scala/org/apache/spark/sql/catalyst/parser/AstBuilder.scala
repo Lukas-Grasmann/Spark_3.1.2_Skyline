@@ -917,6 +917,9 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with SQLConfHelper with Logg
       },
       if (ctx.COMPLETE != null) {
         SkylineIsComplete
+      } else if (ctx.BLOCKNESTEDLOOP != null) {
+        // skyline dimension that forces (complete) block-nested-loop
+        SkylineForceBNL
       } else {
         SkylineUnspecifiedCompleteness
       },

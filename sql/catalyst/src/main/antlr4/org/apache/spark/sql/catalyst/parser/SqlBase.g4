@@ -945,7 +945,7 @@ frameBound
 skylineClause
     : SKYLINE
       skylineDistinct=DISTINCT?
-      skylineComplete=COMPLETE?
+      skylineComplete=(COMPLETE | BLOCKNESTEDLOOP)?
       skylineItems+=skylineItem (',' skylineItems+=skylineItem)*
     ;
 
@@ -1039,6 +1039,7 @@ ansiNonReserved
     | ASC
     | AT
     | BETWEEN
+    | BLOCKNESTEDLOOP
     | BUCKET
     | BUCKETS
     | BY
@@ -1260,6 +1261,7 @@ nonReserved
     | AT
     | AUTHORIZATION
     | BETWEEN
+    | BLOCKNESTEDLOOP
     | BOTH
     | BUCKET
     | BUCKETS
@@ -1510,6 +1512,7 @@ ASC: 'ASC';
 AT: 'AT';
 AUTHORIZATION: 'AUTHORIZATION';
 BETWEEN: 'BETWEEN';
+BLOCKNESTEDLOOP: 'BNL';
 BOTH: 'BOTH';
 BUCKET: 'BUCKET';
 BUCKETS: 'BUCKETS';

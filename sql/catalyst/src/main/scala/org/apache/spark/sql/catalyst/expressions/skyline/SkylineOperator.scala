@@ -61,6 +61,14 @@ case object SkylineIsComplete extends SkylineComplete {
   override def sql: String = "COMPLETE"
 }
 
+/**
+ * Skyline block-nested loop (BNL set) specification (implied complete)
+ */
+case object SkylineForceBNL extends SkylineComplete {
+  override def complete: Boolean = true
+  override def sql: String = "BNL"
+}
+
 case object SkylineUnspecifiedCompleteness extends SkylineComplete {
   override def complete: Boolean = false
   override def sql: String = ""
