@@ -93,13 +93,13 @@ object SkylineUtils extends Logging {
    ) : Seq[SparkPlan] = {
 
     if (skylineComplete == SkylineForceBNL) {
-      BlockNestedLoopSkylineExec(
+      return BlockNestedLoopSkylineExec(
         skylineDistinct,
         skylineDimensions,
         Some(Nil),
         isIncompleteSkyline = false,
         child
-      )
+      ) :: Nil
     }
 
     // check whether at least one dimension is nullable

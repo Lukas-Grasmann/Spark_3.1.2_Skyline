@@ -93,13 +93,16 @@ case class BlockNestedLoopSkylineExec(
     // in case of [[AllTuples]] there is only exactly one partition (on one node)
     child.execute().mapPartitionsInternal { partitionIter =>
       // window for holding current skyline
-      val blockNestedLoopWindow = new mutable.HashSet[InternalRow]()
+      val blockNestedLoopWindow = new mutable.ArrayBuffer[InternalRow]()
 
       // for each row in the partition(-iterator)
       partitionIter.foreach { row =>
         // flag that checks whether the current row is dominated
         var isDominated = false;
         var breakWindowCheck = false;
+
+        // store skyline tuples to be removed
+        val dominatedSkylineTuples = new mutable.ArrayBuffer[InternalRow]()
 
         // emulate foreach loop using an enumerator
         // additionally break loop if current row is itself dominated
@@ -123,7 +126,7 @@ case class BlockNestedLoopSkylineExec(
           dominationResult match {
             case Domination =>
               // if the current row dominates another row the row is removed
-              blockNestedLoopWindow.remove(windowRow)
+              dominatedSkylineTuples.append(windowRow.copy())
             case AntiDomination =>
               // if the row is itself dominated we do not add it by setting isDominated and
               // we can stop checking the rest of the window
@@ -142,8 +145,35 @@ case class BlockNestedLoopSkylineExec(
 
         // only add to window if NOT dominated
         if (!isDominated) {
-          blockNestedLoopWindow += row.copy()
+          // only if the current tuple was NOT dominated AND
+          // there exist tuples which are dominated by the current tuple
+          if (dominatedSkylineTuples.nonEmpty) {
+            blockNestedLoopWindow --= dominatedSkylineTuples
+          }
+
+          // add current (non-dominated) tuple to skyline
+          blockNestedLoopWindow.append(row.copy())
         }
+
+        // #############################################################
+        // # NOTE REGARDING ABOVE ELIMINATIONS FROM THE SKYLINE WINDOW #
+        // #############################################################
+        //
+        // COMPLETE DATASETS:
+        // If a tuple is dominated by another tuple already in the block-nested-loop window
+        // (which is a valid skyline of part of the dataset), it cannot dominate any tuple in
+        // said window due to the transitivity property.
+        //
+        // INCOMPLETE DATASET:
+        // The same requirement as for complete datasets is ensured by skipping dimensionally
+        // incomparable tuples in the incomplete case (i.e. tuples that have missing values
+        // in different skyline dimensions).
+        // Thereby, the result of the algorithm contains correct (local skyline) results even if
+        // multiple clusters grouped by different missing values get sent to the same worker.
+        // Note that this means that such incomparable values can therefore also end up together
+        // in the result set of the worker.
+        // A WORKERS RESULT MAY THEREFORE CONTAIN DATA FROM MULTIPLE CLUSTERS BUT EACH CLUSTER IS
+        // ASSIGNED TO A SINGLE WORKER IN FULL.
       }
 
       // the number of rows after the final iteration is equal to the number of output tuples
