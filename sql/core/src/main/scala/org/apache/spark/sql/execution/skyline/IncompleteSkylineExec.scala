@@ -76,22 +76,28 @@ case class IncompleteSkylineExec(
     // in case of [[AllTuples]] there is only exactly one partition (on one node)
     child.execute().mapPartitionsInternal { partitionIter =>
       // window for holding the entire dataset
-      val datasetWindow = new mutable.HashSet[InternalRow]()
+      val datasetWindow = new mutable.ArrayBuffer[InternalRow]()
       // window for holding current skyline
-      val resultWindow = new mutable.HashSet[InternalRow]()
+      val resultWindow = new mutable.ArrayBuffer[InternalRow]()
 
       // for each row in the partition(-iterator)
       partitionIter.foreach { row =>
-        datasetWindow += row.copy()
+        datasetWindow.append(row.copy())
       }
 
       // for each value in the dataset check dominance
       datasetWindow.foreach { row =>
         // flag that checks whether the current row is dominated
-        var isDominated = false;
+        var isDominated = false
+        // flag for breaking if the tuple is already dominated
+        var breakWindowCheck = false
+
 
         // compare with all remaining values in dataset window
-        datasetWindow.foreach { windowRow =>
+        val iter = datasetWindow.iterator
+        while (iter.hasNext && !breakWindowCheck) {
+          val windowRow = iter.next()
+
           // check dominance for row
           // use [[DominanceUtils]] for converting the row and actually checking dominance
           val dominationResult = DominanceUtils.checkRowDominance(
@@ -106,25 +112,23 @@ case class IncompleteSkylineExec(
           // check domination result and chose action accordingly
           dominationResult match {
             case Domination =>
-              // TODO re-check algorithm
-              // if the current row dominates another row the row is removed
-              // datasetWindow -= windowRow
+              // if the current row dominates another row, we do no action since
+              // transitivity is not guaranteed
             case AntiDomination =>
               // if the row is itself dominated we do not add it by setting isDominated
               isDominated = true
-            case Equality | Incomparability | _ =>
+              breakWindowCheck = true
+            case Equality =>
+              // We do not need to handle duplicates here since all "true" duplicates
+              // were already omitted during the local skyline per definition.
+            case Incomparability | _ =>
               // NO ACTION
-              // note that all [[Equality]] results have no effect on the skyline
-              // all true duplicates were already removed in the local skyline
-              // this is due to the fact that true duplicates also have the same null values
-              // and are therefore in the same cluster
           }
         }
 
         if (!isDominated) {
-          resultWindow += row
+          resultWindow.append(row)
         }
-        // datasetWindow -= row
       }
 
       // the number of rows after the final iteration is equal to the number of output tuples

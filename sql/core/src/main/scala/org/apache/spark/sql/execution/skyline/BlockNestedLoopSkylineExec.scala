@@ -98,8 +98,9 @@ case class BlockNestedLoopSkylineExec(
       // for each row in the partition(-iterator)
       partitionIter.foreach { row =>
         // flag that checks whether the current row is dominated
-        var isDominated = false;
-        var breakWindowCheck = false;
+        var isDominated = false
+        // flag for breaking if the tuple is already dominated
+        var breakWindowCheck = false
 
         // store skyline tuples to be removed
         val dominatedSkylineTuples = new mutable.ArrayBuffer[InternalRow]()
